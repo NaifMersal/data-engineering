@@ -20,52 +20,41 @@ Run `00_setup_check.ipynb` once before Day 1: it builds the shared warehouse, do
 
 New to SQL window functions? Work through `00_sql_windows.ipynb` before Day 1 (self-paced, about 90 minutes). It builds `PARTITION BY`, ranking, `LAG`/`LEAD`, frames and `QUALIFY` up from tables small enough to check by eye, and finishes with you deriving the CDC and SCD2 queries that Lab 1.4 needs.
 
-New to Polars? Work through `tools/polars.ipynb` before Day 1 too (self-paced, about 90 minutes). It introduces one idea at a time on Qafila's data: DataFrames and types, expressions, `select`, `filter`, `with_columns`, `group_by`, joins, `over` and lazy queries, and finishes with you writing the kind of lazy chain Lab 2.1 starts from.
-
-New to dbt? Before Lab 2.3, work through [`tools/dbt.ipynb`](tools/dbt.ipynb) (guided, about 100 minutes). Start with an empty project folder and a few teaching rows, write the configuration and models yourself, and read the SQL dbt generates from them. Step-by-step players replay each dbt run on the project's graph and an incremental `delete+insert` row by row, then compare it with `merge`; you break an incremental model on purpose and watch a failing test skip the report. Five short exercises along the way, and a tested city sales report at the end. This is an extended walkthrough outside the regular 25-minute session lab.
-
-Session 1.1 is taught from [`tools/duckdb.ipynb`](tools/duckdb.ipynb), with no slides: one business question asked of the app database (SQLite) and of pandas, then of DuckDB, a fraction of the time and a file several times smaller. Then the engine itself: in-process, columnar, vectorized; connections and database files; CSV sniffing, globs with `union_by_name`, nested JSON, Parquet; tables vs. views; attaching SQLite; the one-writer lock, broken on purpose; DataFrames and relations in Python; friendly SQL; reading `EXPLAIN ANALYZE`. Three short exercises. Lab 1.1 then points it at the real sources.
-
-Session 1.3 is taught from [`tools/dlt.ipynb`](tools/dlt.ipynb), with no slides: a loader written by hand breaks in four ways (retries, refunds, a new field, the cursor), then dlt does the same job while you read the files and tables it produces. Write dispositions, an incremental cursor whose state survives deleting the pipeline folder, a late record that slips past the cursor, nested data, variant columns and schema contracts; three short exercises. Lab 1.3 then applies it to the real payments API and app database.
-
-Session 2.4 starts from [`tools/pandera.ipynb`](tools/pandera.ipynb): a day of payments with six problems, checked first with hand-written asserts (one failure per run, nulls slip through), then with a Pandera schema: types and nulls, built-in and custom checks, every failure at once with its row, a quarantine split, and the LazyFrame trap broken on purpose. It ends by mapping each rule to its dbt test and running the schema on the real payments feed. Three short exercises; Lab 2.4 then validates the supplier price files.
-
-Session 4.1 is taught from [`tools/dagster.ipynb`](tools/dagster.ipynb), with no slides: a nightly script breaks the usual ways (a re-run loads a day twice, a refund flows into the report, nobody knows what was built when), then the same pipeline as Dagster assets. Selecting part of the graph, the run history and stale assets, resources for dev and prod, a partitioned asset that doubles its rows on a re-run until it is made idempotent, a non-blocking and a blocking asset check, schedules, a sensor with a cursor, retries, and a small dbt project whose models and tests join the graph. A player replays each run from its event log. Three short exercises; Lab 4.1 then orchestrates the real warehouse.
-
-**Lab 3.2 (Spark)** needs Java 17+. On Colab the lab installs it. Locally, install a JDK (for example [Temurin 21](https://adoptium.net/)), set `JAVA_HOME`, then `uv sync --extra spark`. On native Windows, Spark also needs `winutils.exe` to write files, so Windows users should run Lab 3.2 on Colab (or in WSL).
+**Spark** (`tools/spark.ipynb` and Lab 3.2) needs Java 17+. On Colab the notebook installs it. Locally, install a JDK (for example [Temurin 21](https://adoptium.net/)), set `JAVA_HOME`, then `uv sync --extra spark`. On native Windows, Spark also needs `winutils.exe` to write files, so Windows users should run the Spark notebooks on Colab (or in WSL).
 
 Set `DE_QUICK=1` to shrink the heavier workloads. Useful on slow laptops and for checking that notebooks run.
 
 ## Notebooks
 
-| Day | Session | Notebook | Runs on |
-|---|---|---|---|
-| 0 | Setup | [`00_setup_check.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_setup_check.ipynb) | CPU |
-| 0 | Prerequisite: SQL window functions (self-paced) | [`00_sql_windows.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_sql_windows.ipynb) | CPU |
-| 0 | Prerequisite: Polars, one idea at a time (self-paced) | [`tools/polars.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/polars.ipynb) | CPU |
-| 1 | Walkthrough: DuckDB, an analytical database in a library (taught before Lab 1.1) | [`tools/duckdb.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/duckdb.ipynb) | CPU |
-| 1 | Platform tour | [`D1_1_platform_tour.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_1_platform_tour.ipynb) | CPU |
-| 1 | Files & columnar storage | [`D1_2_files_parquet.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_2_files_parquet.ipynb) | CPU |
-| 1 | Walkthrough: dlt, from a hand-written loader to an incremental pipeline (taught before Lab 1.3) | [`tools/dlt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dlt.ipynb) | CPU |
-| 1 | Batch ingestion (dlt) | [`D1_3_ingestion_dlt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_3_ingestion_dlt.ipynb) | CPU |
-| 1 | CDC & SCD2 | [`D1_4_cdc_merge_scd.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_4_cdc_merge_scd.ipynb) | CPU |
-| 2 | Bronze → silver (DuckDB, Polars) | [`D2_1_bronze_to_silver.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_1_bronze_to_silver.ipynb) | CPU |
-| 2 | Dimensional modeling | [`D2_2_dimensional_modeling.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_2_dimensional_modeling.ipynb) | CPU |
-| 2 | Guided preparation: dbt from an empty folder (about 100 min) | [`tools/dbt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dbt.ipynb) | CPU |
-| 2 | dbt project | [`D2_3_dbt_project.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_3_dbt_project.ipynb) | CPU |
-| 2 | Walkthrough: Pandera, checks at the door (taught before Lab 2.4) | [`tools/pandera.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/pandera.ipynb) | CPU |
-| 2 | Testing & data quality | [`D2_4_data_quality.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_4_data_quality.ipynb) | CPU |
-| 3 | Iceberg lakehouse | [`D3_1_iceberg_lakehouse.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_1_iceberg_lakehouse.ipynb) | CPU |
-| 3 | Spark | [`D3_2_spark.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_2_spark.ipynb) | **Colab** (or Java 17+) |
-| 3 | Streaming fundamentals | [`D3_3_streaming_fundamentals.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_3_streaming_fundamentals.ipynb) | CPU |
-| 3 | Streams into the lakehouse | [`D3_4_stream_to_lakehouse.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_4_stream_to_lakehouse.ipynb) | CPU |
-| 4 | Walkthrough: Dagster, assets on a schedule (taught before Lab 4.1) | [`tools/dagster.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dagster.ipynb) | CPU |
-| 4 | Orchestration (Dagster) | [`D4_1_orchestration_dagster.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_1_orchestration_dagster.ipynb) | CPU |
-| 4 | Contracts & observability | [`D4_2_contracts_observability.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_2_contracts_observability.ipynb) | CPU |
-| 4 | Governance & privacy | [`D4_3_governance_privacy.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_3_governance_privacy.ipynb) | CPU |
-| 4 | Data for AI | [`D4_4_data_for_ai.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_4_data_for_ai.ipynb) | CPU (optional LLM endpoint) |
+Every session is taught first, then practised in its lab: 📓 tool sessions from a walkthrough notebook in `tools/` (no slides), 🖥️ concept sessions from a short deck. The table is generated by `_tools/sessions.py` from the course's session list, which also writes the course page.
 
-Labs 0 (SQL windows), 1.2, 1.4, 2.0 (dbt), 3.1 and 3.3 end with a **🖼️ Visual summary**: figures drawn from the lab's own results (row-group statistics, SCD2 timelines, the dbt project's graph, the Iceberg metadata tree, watermarks). The drawing code is in `de_viz.py`.
+| Before Day 1 | Notebook | Runs on |
+|---|---|---|
+| Setup check | [`00_setup_check.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_setup_check.ipynb) | CPU |
+| SQL window functions (self-paced) | [`00_sql_windows.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_sql_windows.ipynb) | CPU |
+
+<!-- notebooks:begin -->
+| Session | Taught from | Lab | Runs on |
+|---|---|---|---|
+| D1_1 · The modern data platform | 📓 [`tools/duckdb.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/duckdb.ipynb): DuckDB, an analytical database in a library | [`D1_1_platform_tour.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_1_platform_tour.ipynb) | CPU |
+| D1_2 · Files & columnar storage | 🖥️ [slides](https://sdaiaacademy.github.io/data-engineering/slides/D1_2_files_parquet.html) | [`D1_2_files_parquet.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_2_files_parquet.ipynb) | CPU |
+| D1_3 · Batch ingestion | 📓 [`tools/dlt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dlt.ipynb): dlt, from a hand-written loader to an incremental pipeline | [`D1_3_ingestion_dlt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_3_ingestion_dlt.ipynb) | CPU |
+| D1_4 · Change data capture & load strategies | 🖥️ [slides](https://sdaiaacademy.github.io/data-engineering/slides/D1_4_cdc_scd.html) | [`D1_4_cdc_merge_scd.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_4_cdc_merge_scd.ipynb) | CPU |
+| D2_1 · Bronze to silver | 📓 [`tools/polars.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/polars.ipynb): Polars, one idea at a time | [`D2_1_bronze_to_silver.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_1_bronze_to_silver.ipynb) | CPU |
+| D2_2 · Dimensional modeling | 🖥️ [slides](https://sdaiaacademy.github.io/data-engineering/slides/D2_2_modeling.html) | [`D2_2_dimensional_modeling.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_2_dimensional_modeling.ipynb) | CPU |
+| D2_3 · dbt: transformation as software | 📓 [`tools/dbt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dbt.ipynb): dbt, from an empty folder to a tested report | [`D2_3_dbt_project.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_3_dbt_project.ipynb) | CPU |
+| D2_4 · Testing & data quality | 📓 [`tools/pandera.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/pandera.ipynb): Pandera, checks at the door | [`D2_4_data_quality.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_4_data_quality.ipynb) | CPU |
+| D3_1 · Open table formats & the lakehouse | 📓 [`tools/iceberg.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/iceberg.ipynb): Iceberg, open table formats on a lightboard | [`D3_1_iceberg_lakehouse.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_1_iceberg_lakehouse.ipynb) | CPU |
+| D3_2 · Distributed processing with Spark | 📓 [`tools/spark.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/spark.ipynb): Spark, live and visual | [`D3_2_spark.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_2_spark.ipynb) | **Colab** (or Java 17+) |
+| D3_3 · Streaming fundamentals | 🖥️ [slides](https://sdaiaacademy.github.io/data-engineering/slides/D3_3_streaming.html) + [`demos/D3_3_streaming_demo.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/demos/D3_3_streaming_demo.ipynb) | [`D3_3_streaming_fundamentals.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_3_streaming_fundamentals.ipynb) | CPU |
+| D3_4 · Real-time pipelines into the lakehouse | 🖥️ [slides](https://sdaiaacademy.github.io/data-engineering/slides/D3_4_stream_lakehouse.html) + [`demos/D3_4_stream_lakehouse_demo.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/demos/D3_4_stream_lakehouse_demo.ipynb) | [`D3_4_stream_to_lakehouse.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_4_stream_to_lakehouse.ipynb) | CPU |
+| D4_1 · Orchestration | 📓 [`tools/dagster.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dagster.ipynb): Dagster, assets on a schedule | [`D4_1_orchestration_dagster.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_1_orchestration_dagster.ipynb) | CPU |
+| D4_2 · Observability & data contracts | 🖥️ [slides](https://sdaiaacademy.github.io/data-engineering/slides/D4_2_contracts_observability.html) | [`D4_2_contracts_observability.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_2_contracts_observability.ipynb) | CPU |
+| D4_3 · Governance, security & privacy | 🖥️ [slides](https://sdaiaacademy.github.io/data-engineering/slides/D4_3_governance_privacy.html) | [`D4_3_governance_privacy.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_3_governance_privacy.ipynb) | CPU |
+| D4_4 · Data engineering for AI + capstone kickoff | 🖥️ [slides](https://sdaiaacademy.github.io/data-engineering/slides/D4_4_data_for_ai.html) | [`D4_4_data_for_ai.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_4_data_for_ai.ipynb) | CPU (optional LLM endpoint) |
+<!-- notebooks:end -->
+
+`00_sql_windows`, Labs 1.2, 1.4, 3.1 and 3.3, and the dbt and dlt walkthroughs end with a **🖼️ Visual summary**: figures drawn from the lab's own results (row-group statistics, SCD2 timelines, the dbt project's graph, the Iceberg metadata tree, watermarks). The drawing code is in `de_viz.py`.
 
 Exercises are marked **✏️ Exercise** and raise `NotImplementedError` until you fill them in. Complete reference versions are in `solutions/`. Cells marked **✱ Stretch** are optional. Self-checks print ✅ or ❌.
 
@@ -75,7 +64,30 @@ The DuckDB walkthrough is self-contained (`artifacts/tools_duckdb/`): it builds 
 The Pandera walkthrough is self-contained (`artifacts/tools_pandera/`), apart from reading the payments feed in its last section.
 The Dagster walkthrough is self-contained (`artifacts/tools_dagster/`, including its run history in `dagster_home/`), apart from reading the Qafila dbt project's graph at the end.
 The dlt walkthrough is self-contained too (`artifacts/tools_dlt/`), apart from one look at the local payments API.
-The guided dbt walkthrough is self-contained: it creates its own tiny teaching database and project in `artifacts/tools_dbt/`, without using the shared warehouse. Rerunning its workspace setup cell resets only that walkthrough's generated files. Its student notebook has five exercises; the reference notebook in `solutions/tools/` includes their answers.
+The dbt walkthrough is self-contained: it creates its own tiny teaching database and project in `artifacts/tools_dbt/`, without using the shared warehouse. Rerunning its workspace setup cell resets only that walkthrough's generated files.
+The Polars walkthrough reads the app database and the courier feed directly; the Iceberg walkthrough builds its table from the payments feed (`artifacts/tools_iceberg/`); the Spark walkthrough exports the warehouse to a small Parquet lake (`artifacts/tools_spark/`).
+
+## Tool walkthroughs
+
+Each one starts with the job done by hand and watches it break, gives the tool's mental model, then builds its features one at a time on Qafila data, with 🤔 predictions, short ✏️ exercises and self-checks. It ends back on the platform map: what the tool does and doesn't, its managed equivalents, and the lab that follows. The answers, and the instructor notes (🎓), are in `solutions/tools/`.
+
+**DuckDB** (D1_1, [`tools/duckdb.ipynb`](tools/duckdb.ipynb)): one business question asked of the app database (SQLite) and of pandas, then of DuckDB, a fraction of the time and a file several times smaller. Then the engine itself: in-process, columnar, vectorized; connections and database files; CSV sniffing, globs with `union_by_name`, nested JSON, Parquet; tables vs. views; attaching SQLite; the one-writer lock, broken on purpose; DataFrames and relations in Python; friendly SQL; reading `EXPLAIN ANALYZE`. Three exercises. Lab 1.1 then points it at the real sources.
+
+**dlt** (D1_3, [`tools/dlt.ipynb`](tools/dlt.ipynb)): a loader written by hand breaks in four ways (retries, refunds, a new field, the cursor), then dlt does the same job while you read the files and tables it produces. Write dispositions, an incremental cursor whose state survives deleting the pipeline folder, a late record that slips past the cursor, nested data, variant columns and schema contracts. Three exercises. Lab 1.3 then applies it to the real payments API and app database.
+
+**Polars** (D2_1, [`tools/polars.ipynb`](tools/polars.ipynb)): a question answered by a Python loop over the courier feed, about 20 times slower than the same lazy query. Then DataFrames and types, expressions and their four contexts, `filter`, `with_columns` (time zones), `group_by`, joins (an anti join finds the orphan orders), `over`, lazy plans and pushdown, and one chain checked against SQL. Nine exercises. Lab 2.1 then cleans the messy parts: timestamps, duplicates, customers.
+
+**dbt** (D2_3, [`tools/dbt.ipynb`](tools/dbt.ipynb)): three SQL files run by hand go wrong (run order, a stale report), then a project built from an empty folder, reading every piece of SQL dbt generates: sources, a view, `ref()` and the graph, view vs. table vs. incremental (broken on purpose), macros, tests. Then warn vs. error, an enforced contract, a unit test that catches what every data test misses, and where each check belongs. Step-by-step players replay each run. Five exercises. Lab 2.3 builds the Qafila project; Lab 2.4 adds its tests.
+
+**Pandera** (D2_4, [`tools/pandera.ipynb`](tools/pandera.ipynb)): a day of payments with six problems, checked first with hand-written asserts (one failure per run, nulls slip through), then with a Pandera schema: types and nulls, built-in and custom checks, every failure at once with its row, a quarantine split, and the LazyFrame trap broken on purpose. It ends by mapping each rule to its dbt test and running the schema on the real payments feed. Three exercises. Lab 2.4 then validates the supplier price files.
+
+**Iceberg** (D3_1, [`tools/iceberg.ipynb`](tools/iceberg.ipynb)): a folder of Parquet files hides a failed load and can't change one row. Then an Iceberg table, layer by layer: the catalog, one commit bottom-up (and a crash before the pointer swap), readers skipping files, a copy-on-write delete, time travel, two writers racing, a rename that rewrites nothing, DuckDB on the same table. Boards replay each step from the table's own metadata files. Three exercises. Lab 3.1 then builds `qafila.orders`.
+
+**Spark** (D3_2, [`tools/spark.ipynb`](tools/spark.ipynb)): do you need a cluster at all? Then the driver, executors and tasks, partitions, lazy plans, the shuffle, broadcast vs. sort-merge joins, skew and one file per task, each drawn from what Spark just returned. Two exercises. Runs on Colab (Java 17+). Lab 3.2 then measures pruning, broadcasts, salting and small files.
+
+**Dagster** (D4_1, [`tools/dagster.ipynb`](tools/dagster.ipynb)): a nightly script breaks the usual ways (a re-run loads a day twice, a refund flows into the report, nobody knows what was built when), then the same pipeline as Dagster assets. Selecting part of the graph, the run history and stale assets, resources for dev and prod, a partitioned asset that doubles its rows on a re-run until it is made idempotent, a non-blocking and a blocking asset check, schedules, a sensor with a cursor, retries, and a small dbt project whose models and tests join the graph. A player replays each run from its event log. Three exercises. Lab 4.1 then orchestrates the real warehouse.
+
+Every walkthrough also has a **read-only copy with all its outputs** in `tools/html/` (linked as "read" on the course page), for reading without running, or when Colab is slow.
 
 ## Data
 
@@ -116,3 +128,5 @@ uv run python _tools/py2nb.py D3_1_iceberg_lakehouse   # rebuild one
 uv run python _tools/py2nb.py dbt                # one tool walkthrough: _src/tools/dbt.py → tools/ + solutions/tools/
 ```
 A markdown cell headed `# %% [markdown] 🎓` is an instructor note: it goes into the solution notebook only.
+
+The session tables of this README and of the course page come from one list in `_tools/sessions.py`: edit it, then `uv run python _tools/sessions.py`. The read-only copies in `tools/html/` are exported from the executed solution notebooks with `uv run python _tools/export_html.py` (execute a solution first if its outputs are stale; Spark needs Colab or WSL).
