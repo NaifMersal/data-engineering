@@ -1,138 +1,132 @@
-/* Original Qafila story. Recurring illustrations preserve continuity across the evolving architecture. */
+/* The story engine. One board evolves: shared data-ids glide between slides, and zoom scenes dive into one element.
+   A deck script adds its scenes with Story.add and then calls Story.start (see 00_story.js). */
 (() => {
 'use strict';
 const root=document.getElementById('stage');
 if(location.search.includes('check'))document.body.classList.add('checking');
-const sources={reference:'https://www.youtube.com/watch?v=Grx95nfsz08',aws:'https://aws.amazon.com/compare/the-difference-between-a-data-warehouse-data-lake-and-data-mart/',lakehouse:'https://docs.databricks.com/aws/en/lakehouse/',iceberg:'https://iceberg.apache.org/docs/latest/reliability/'};
 const art=(kind,x,y,w,title='',detail='',id=kind)=>`<figure class="figure" data-id="${id}" style="left:${x}px;top:${y}px;width:${w}px;margin:0"><div class="art ${kind}" aria-hidden="true"></div>${title?`<figcaption>${title}</figcaption>`:''}${detail?`<p class="detail">${detail}</p>`:''}</figure>`;
 const label=(text,x,y,cls='',w=300,id='')=>`<div class="label ${cls}" ${id?`data-id="${id}"`:''} style="left:${x}px;top:${y}px;width:${w}px">${text}</div>`;
 const note=(text,x,y,cls='',w=320)=>`<p class="annotation ${cls}" style="left:${x}px;top:${y}px;width:${w}px">${text}</p>`;
-const path=(d,cls='')=>`<path class="wire ${cls}" d="${d}"/>`;
-const outline=(x,y,w,h,cls='')=>`<path class="enclosure ${cls}" d="M${x+11} ${y} L${x+w-6} ${y+2} Q${x+w+2} ${y+3} ${x+w} ${y+13} L${x+w-2} ${y+h-9} Q${x+w-1} ${y+h+2} ${x+w-12} ${y+h} L${x+5} ${y+h-1} Q${x-2} ${y+h} ${x} ${y+h-13} L${x+1} ${y+9} Q${x} ${y-1} ${x+11} ${y}Z"/>`;
+// Wires and enclosures with the same id reshape between slides; without an id they match only when identical.
+const path=(d,cls='',id='')=>`<path class="wire ${cls}"${id?` data-id="${id}"`:''} d="${d}"/>`;
+const outline=(x,y,w,h,cls='',id='')=>`<path class="enclosure ${cls}"${id?` data-id="${id}"`:''} d="M${x+11} ${y} L${x+w-6} ${y+2} Q${x+w+2} ${y+3} ${x+w} ${y+13} L${x+w-2} ${y+h-9} Q${x+w-1} ${y+h+2} ${x+w-12} ${y+h} L${x+5} ${y+h-1} Q${x-2} ${y+h} ${x} ${y+h-13} L${x+1} ${y+9} Q${x} ${y-1} ${x+11} ${y}Z"/>`;
 let svgCount=0;
 const svg=content=>{const id=svgCount++;return `<svg class="wires" viewBox="0 0 1440 510" aria-hidden="true"><defs>${[['normal','#61717c'],['em','#348f8d'],['danger','#c46558']].map(([k,c])=>`<marker id="arr-${id}-${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1L9 5L1 9" fill="none" stroke="${c}" stroke-width="1.3"/></marker>`).join('')}</defs>${content.replace(/class="wire([^"]*)"/g,(_,cls)=>`class="wire${cls}" marker-end="url(#arr-${id}-${cls.includes('em')?'em':cls.includes('danger')?'danger':'normal'})"`)}</svg>`;};
 const box=(title,body,x,y,w,cls='',id=title,tag='')=>`<div class="stage-box ${cls}" data-id="${id}" style="left:${x}px;top:${y}px;width:${w}px"><h3>${title}</h3>${body}${tag?`<span class="tag">${tag}</span>`:''}</div>`;
-const src=(files=false)=>label('SOURCE SYSTEMS',22,0,'hand muted',300,'sources-title')+art('app',10,60,125,'Qafila app','','app')+art('db',160,73,155,'Orders + payments','','source-db')+(files?art('files',40,270,170,'Events + reviews','','source-files'):'');
-const users=(both=false)=>label('CONSUMERS',1180,0,'hand muted',250,'users-title')+art('analyst',1200,55,165,'Analysts','Reports + BI','analyst')+(both?art('engineer',1200,305,150,'Data scientists','Explore + ML','scientist'):'');
-const warehouse=(layers=false)=>label('DATA WAREHOUSE',504,30,'hand blue',480,'warehouse-title')+(layers?box('Landed','<p>Source tables</p>',420,140,175,'','staging')+box('Integrated','<p>Shared entities</p>',640,140,175,'','core')+box('Served','<p>Business models</p>',860,140,175,'','marts'):art('warehouse',610,113,220,'Shared analytical tables','','warehouse'));
+// Tool names sit beside the work they perform. Dataset boxes always describe stored data.
+const tool=(name,action,x,y,w=250,id=name,cls='')=>label(`<strong>${name}</strong><span>${action}</span>`,x,y,`tool-label ${cls}`,w,id);
+// The course map, redrawn by stage. The same data as de_viz.platform_map (labs/de_viz.py) and the decks' .pmap (assets/deck/deck.js): change them together.
+// mark(name) returns '' (plain), 'met' (faded) or 'fresh' (highlighted); a fresh piece with what[name] shows that instead of its session code.
+const MAP_TOOLS=[['dlt','2/3',2,'D1_3'],['DuckDB','3/7',2,'D1_1'],['CDC + MERGE','2/3',3,'D1_4'],['Parquet','3/4',3,'D1_2'],['Polars','4/6',3,'D2_1'],['Semantic layer','6/7',3,'D4_4'],['Streaming','2/3',4,'D3_3'],['Iceberg','3/4',4,'D3_1'],['dbt','4/6',4,'D2_2 · D2_3'],['Embeddings','6/7',4,'D4_4'],['Spark','4/5',5,'D3_2'],['Pandera','5/6',5,'D2_4'],['Contracts','5/6',6,'D4_2']];
+const MAP_BANDS=[['Orchestrate','Dagster: assets, schedules, checks',7,'D4_1'],['Observe','freshness, volume, schema, distribution, lineage',8,'D4_2'],['Govern','PDPL, masking, access',9,'D4_3']];
+const platform=(mark=()=>'',what={})=>{
+ const cls=n=>mark(n)?' '+mark(n):'',tail=(n,code)=>mark(n)==='fresh'&&what[n]?`<span class="what">${what[n]}</span>`:`<small>${code}</small>`;
+ return `<div class="platform" data-id="map">${['Sources','Ingest','Store','Transform','Test','Serve'].map((h,i)=>`<div class="h" style="grid-column:${i+1};grid-row:1">${h}</div>`).join('')}${['App database','Payments API','CDC feed','Click events','Files, reviews'].map((s,i)=>`<div class="s" style="grid-column:1;grid-row:${i+2}">${s}</div>`).join('')}${MAP_TOOLS.map(([n,col,row,code])=>`<div class="t${cls(n)}" style="grid-column:${col};grid-row:${row}"><b>${n}</b>${tail(n,code)}</div>`).join('')}${MAP_BANDS.map(([n,text,row,code])=>`<div class="b${cls(n)}" style="grid-column:2/-1;grid-row:${row}"><b>${n}</b><span>${text}</span>${tail(n,code)}</div>`).join('')}</div>`;
+};
 const scenes=[];
+// extra.cover: the cover title's HTML. extra.zoom: {in:id} enters an element of the previous slide; {out:id} returns to an element of this slide.
+// extra.quiz: {answer,right,wrong} for a slide with .quiz-option buttons.
 const add=(chapter,title,subtitle,body,takeaway,notes,refs=[],extra={})=>scenes.push({chapter,title,subtitle,body,takeaway,notes,refs,...extra});
 
-add('The question','Warehouse, lake, lakehouse','',svg(path('M260 130 C350 130 350 190 420 210')+path('M500 380 C500 450 420 460 330 450'))+art('warehouse',45,5,215,'Warehouse','','cover-warehouse')+art('lake',420,135,240,'Lake','','cover-lake')+art('house',90,290,230,'Lakehouse','','cover-house'),
-'A visual story about what changes as Qafila’s data needs grow.',
-'About 25 minutes. Qafila is a fictional grocery delivery company. Follow changing requirements, not a compulsory migration ladder. Ask learners which term they have heard. Arrow keys navigate, N opens notes, O opens overview, F enters fullscreen. The original illustrations intentionally recur to preserve visual continuity.',['reference'],{cover:true});
-
-add('01 / Scattered answers','Everyone builds a different report','Qafila’s teams query the same sources and apply their own rules.',
-svg(path('M310 160 C530 20 800 30 1160 120')+path('M310 185 C620 150 800 220 1165 300')+path('M300 200 C650 375 840 390 990 410'))+src()+art('analyst',1190,30,150,'Finance','','finance')+art('analyst',1190,235,150,'Operations','','ops')+art('engineer',1000,320,140,'Another extract','','extra')+note('Refunds included?',520,20,'red')+note('Cancelled orders?',600,160,'red')+note('Whose revenue is right?',450,400,'red',390),
-'<strong>The problem:</strong> each report repeats integration work and chooses its own definition.',
-'Two correctly calculated numbers can disagree because they answer different questions. In this hypothetical example finance subtracts refunds while operations counts created orders. Central storage alone cannot settle the definition.');
-
-add('02 / The warehouse','A shared place for analytical tables','A data engineer prepares reusable models. Analysts query the common result.',
-svg(outline(395,58,660,355,'blue')+path('M315 176 C350 176 355 176 393 176','em')+path('M1060 175 L1180 175','em'))+src()+warehouse()+users()+art('engineer',870,200,125,'Data engineer','','engineer')+note('Agree the meaning once',475,420,'teal',450)+label('load + model',332,102,'hand muted',240),
-'<strong>Warehouse:</strong> an analytical database with shared tables for reporting.',
-'The sources stay in place. Introduce the warehouse in the middle. In ETL data transforms before the target load. In ELT raw data can land first and transform inside the warehouse. The team still owns definitions and quality.',['aws']);
-
-add('02 / Inside the warehouse','Land, integrate, serve','The layers separate source cleanup from shared entities and business use.',
-svg(outline(395,58,680,355,'blue')+path('M315 185 L412 185')+path('M598 225 L631 225','em')+path('M818 225 L852 225','em')+path('M1078 180 L1180 175'))+src()+warehouse(true)+users()+note('Land the<br>source',425,348,'center',175)+note('Join the<br>business',640,348,'center',175)+note('Serve a<br>question',866,348,'center',175),
-'<strong>One platform, several layers.</strong> Each layer makes a different promise.',
-'Describe each layer by its promise, not its name. The landed layer keeps source structure and normalizes types. The integrated layer joins business entities. The served layer answers particular analytical needs. The reference video calls them Stage, Core, Mart; the vocabulary slide after the lakehouse maps every name to the bronze, silver, gold used in this course.',['reference']);
-
-add('03 / A new requirement','The next question needs new evidence','“Why are some deliveries late?” Revenue tables alone cannot answer it.',
-svg(outline(395,58,660,355,'blue')+path('M315 175 L393 175')+path('M260 360 C350 360 360 280 393 280','danger')+path('M1060 175 L1180 175'))+src(true)+warehouse()+users()+note('Courier event history',335,395,'red',370)+note('Support text + photos',335,440,'red',370)+note('We did not retain<br>this detail',900,410,'red',350),
-'<strong>The pressure:</strong> retain diverse source detail before every future question is known.',
-'This is a limitation of Qafila’s current model and retention choices. Modern warehouses can process JSON, text, large histories and ML workloads. A lake is an option for retaining broad source detail. Ask what is lost when only daily aggregates remain.');
-
-add('04 / The data lake','A home for the original evidence','Land files in object storage, then prepare them for each use case.',
-svg(outline(395,58,660,385,'teal')+path('M315 175 C420 175 450 190 542 210','em')+path('M240 350 C370 350 435 320 542 285','em')+path('M1060 175 L1180 175')+path('M1060 310 C1110 310 1140 360 1180 360'))+src(true)+users(true)+label('DATA LAKE',530,25,'hand teal',450,'lake-title')+art('lake',535,115,255,'Object storage','','lake')+label('JSON    text    Parquet',560,415,'muted',410,'formats')+note('Keep it now.<br>Shape it when needed.',830,195,'teal',210),
-'<strong>Lake:</strong> a repository of raw and curated files that processing engines can read.',
-'SQL engines and Python process the files. A lake may have well-governed curated datasets. The warehouse can remain if it serves reporting well. Retaining evidence preserves options, subject to access and retention policies.',['aws']);
-
-add('04 / A folder is not a transaction','Which version did the dashboard read?','A job replaces several Parquet files while a query reads the folder.',
-svg(path('M330 205 L495 205')+path('M950 205 L1150 205','danger'))+art('engineer',70,105,210,'Writer','','writer')+box('orders/','<div class="data-title"><span>File</span><span>Version</span></div><div class="data-row"><span>part-1</span><span style="color:#268b7e">new</span></div><div class="data-row"><span>part-2</span><span>old</span></div>',510,100,390,'','folder')+art('analyst',1170,105,210,'Reader','','reader')+note('The first file has changed…',415,15,'',480)+note('…the second has not.',680,380,'red',400)+note('A mixed result',1100,390,'red',300),
-'<strong>The gap:</strong> plain files alone do not publish a whole table update atomically.',
-'This is a deliberately unsafe multi-file update. Atomic individual writes and strongly consistent object storage do not themselves define a multi-file table transaction. Ask whether a bigger server changes that guarantee.',['iceberg']);
-
-add('05 / Two systems to operate','A lake beside a warehouse','One team explores source files. Another serves modeled reports.',
-svg(outline(400,35,650,200,'blue')+outline(400,275,650,200,'teal')+path('M315 170 C350 170 355 145 395 145')+path('M315 175 C350 175 355 365 395 365')+path('M1055 135 L1180 135')+path('M1055 370 L1180 370')+path('M240 350 C300 350 350 365 395 365'))+src(true)+users(true)+art('warehouse',445,48,145,'Warehouse','','warehouse-small')+label('Curated reporting tables',680,105,'hand blue',340)+art('lake',445,280,140,'Lake','','lake-small')+label('Retained source files',680,350,'hand teal',330),
-'A hybrid can work well. Shared table data may reduce some copying and coordination.',
-'This is a valid architecture. If duplicate curated data becomes expensive to coordinate, teams can consider shared tables over lake storage. Do not promise that all copies or pipelines disappear.');
-
-add('06 / The lakehouse','Reliable tables over lake storage','The files stay in the lake. A table format defines committed versions.',
-svg(outline(395,58,660,385,'teal')+path('M315 175 L393 175','em')+path('M245 350 C310 350 345 300 393 300','em')+path('M1060 175 L1180 175','em')+path('M1060 300 C1110 300 1145 365 1180 365','em'))+src(true)+users(true)+label('DATA LAKEHOUSE',490,25,'hand teal',550,'house-title')+art('house',465,130,225,'Lake storage','','house')+art('catalog',790,135,185,'Table format + catalog','','catalog')+note('Files + committed snapshots',465,405,'teal',550)+label('Iceberg is our course example',790,80,'muted',310),
-'<strong>Lakehouse:</strong> lake storage with a reliable table layer for analytical workloads.',
-'Parquet holds data. Iceberg defines metadata, snapshots and commits. A catalog resolves table identities and current metadata. Compatible engines read and write. Quality, access control, governance and optimization still need work. Raw text and images may remain alongside tables.',['lakehouse','iceberg']);
-
-add('06 / Inside the lakehouse','Bronze, Silver, Gold','The same platform holds datasets at different levels of readiness.',
-svg(outline(395,58,680,365,'teal')+path('M315 175 L412 175')+path('M245 350 C315 350 355 225 412 225')+path('M598 225 L631 225','em')+path('M818 225 L852 225','em')+path('M1078 180 L1180 180')+path('M820 420 C980 490 1110 400 1180 365'))+src(true)+users(true)+label('DATA LAKEHOUSE',505,28,'hand teal',500,'house-title')+box('Bronze','<p>Source history</p>',420,140,175,'bronze','bronze','Retain')+box('Silver','<p>Validated records</p>',640,140,175,'silver','silver','Clean')+box('Gold','<p>Business datasets</p>',860,140,175,'gold','gold','Serve')+note('Raw evidence',424,360,'orange',200)+note('Usable records',644,360,'',220)+note('Agreed meaning',867,360,'teal',230),
-'Architecture describes the platform. Bronze, Silver and Gold describe its datasets.',
-'Match the positions of the warehouse layer scene so learners can compare. Boundaries and names vary. Gold can contain a detailed fact table, not only aggregates. Bronze still has retention and access rules. The readiness concept can apply in other architectures.',['lakehouse']);
-
-add('06 / One vocabulary','Same promises, many names','This course says bronze, silver, gold. Here is where each lives in the Qafila project.',
-'<table class="mapping"><thead><tr><th>The promise</th><th>Zone</th><th>Where it lives at Qafila</th><th>Other names you’ll hear</th></tr></thead><tbody><tr class="bronze"><td>Kept as the source sent it</td><td class="zone">Bronze</td><td>DuckDB schema <code>raw</code> (loaded by dlt), Iceberg <code>bronze.*</code></td><td>landing, raw, stage</td></tr><tr class="silver"><td>Clean, typed, consistent</td><td class="zone">Silver</td><td>dbt <code>staging/</code> + <code>intermediate/</code>, Lab 2.1’s outputs</td><td>core, conformed, integrated</td></tr><tr class="gold"><td>Answers a business question</td><td class="zone">Gold</td><td>dbt <code>marts/</code>: <code>fct_*</code>, <code>dim_*</code>, <code>mart_*</code></td><td>marts, presentation, serving</td></tr></tbody></table><p class="trap"><b>The trap:</b> a warehouse “stage” is the landed copy (bronze), but dbt’s <code>stg_*</code> models are cleaned data (silver).</p>',
-'<strong>One vocabulary:</strong> every deck, notebook and model name in this course uses these three words.',
-'Read the table by rows: the promise first, then the name. Point at the trap: learners who know dbt read stg_ as raw, and learners who know a warehouse read stage as cleaned. dbt’s staging / intermediate / marts are folders of models inside silver and gold, not three more zones. Every session from here on names its zone.',['reference','lakehouse']);
-
-add('07 / The comparison','Three organizing ideas','The workload and required guarantees guide the choice.',
-'<div class="comparison"><div class="compare-col"><div class="art warehouse" aria-hidden="true"></div><h3>Warehouse</h3><p>Shared analytical<br>tables and SQL models</p><p class="fine">Qafila’s financial reporting</p></div><div class="compare-col"><div class="art lake" aria-hidden="true"></div><h3>Lake</h3><p>A repository of files<br>for retention and exploration</p><p class="fine">Courier event history</p></div><div class="compare-col"><div class="art house" aria-hidden="true"></div><h3>Lakehouse</h3><p>Reliable tables<br>over lake storage</p><p class="fine">Shared datasets for BI and ML</p></div></div>',
-'Real products combine capabilities. None of these names guarantees clean data.',
-'Ask learners to explain each pattern without a vendor name. These are organizing ideas and typical uses, not exclusive capabilities. Warehouses support external tables and semi-structured data. Lakes can be governed. Cost and performance depend on workload and operations.',['aws','lakehouse']);
-
-add('08 / A learner decision','What should Qafila change first?','The dashboard reads a mixture of old and new Parquet files.',
-art('analyst',1100,70,270,'“Which result can I trust?”','','quiz-analyst')+'<button class="quiz-option" data-answer="A" style="top:35px"><span class="letter">A</span><span>Rename the folder “Gold”</span></button><button class="quiz-option" data-answer="B" style="top:140px"><span class="letter">B</span><span>Use atomic table commits and compatible readers</span></button><button class="quiz-option" data-answer="C" style="top:245px"><span class="letter">C</span><span>Move the same files to a bigger server</span></button><p class="feedback" role="status"></p><p class="quiz-instruction">Choose an answer, then explain what guarantee it changes.</p>',
-'Explain what changes for the reader, as well as the technology you would choose.',
-'Allow 45 seconds. B is correct. Ask what A and C fail to change. Follow up: does the table format also remove duplicate E7 events? No, that requires a data transformation rule.',['iceberg']);
-
-add('08 / The guarantee','One complete table version','A writer prepares new files, then publishes a snapshot atomically.',
-svg(path('M410 210 L565 210','em')+path('M870 210 L1025 210','em'))+box('Snapshot 41','<div class="number">41</div><p>Both old files</p>',40,100,360,'silver','snapshot41')+art('engineer',600,85,210,'Prepare + commit','','commit-engineer')+box('Snapshot 42','<div class="number">42</div><p>Both new files</p>',1050,100,350,'gold','snapshot42')+note('Current reads remain consistent',40,380,'',440)+note('New reads use the new snapshot',1000,380,'teal',440),
-'<strong>Atomic publication:</strong> readers use a committed version while a writer works.',
-'Snapshot numbers are illustrative. Existing queries can continue using their chosen snapshot. Failure before commit leaves the current table version visible. Maintenance later removes unreferenced files. These guarantees do not replace access control, business definitions or quality checks.',['iceberg']);
-
-add('09 / The Qafila platform','Every tool has a stage','Data moves left to right. Some tools work in one stage; DuckDB, Polars and dbt span several.',
-'<div class="platform"><div class="h" style="grid-column:1;grid-row:1">Sources</div><div class="h" style="grid-column:2;grid-row:1">Ingest</div><div class="h" style="grid-column:3;grid-row:1">Store</div><div class="h" style="grid-column:4;grid-row:1">Transform</div><div class="h" style="grid-column:5;grid-row:1">Test</div><div class="h" style="grid-column:6;grid-row:1">Serve</div><div class="s" style="grid-column:1;grid-row:2">App database</div><div class="s" style="grid-column:1;grid-row:3">Payments API</div><div class="s" style="grid-column:1;grid-row:4">CDC feed</div><div class="s" style="grid-column:1;grid-row:5">Click events</div><div class="s" style="grid-column:1;grid-row:6">Files, reviews</div><div class="t" style="grid-column:2/3;grid-row:2"><b>dlt</b><small>D1_3</small></div><div class="t" style="grid-column:3/7;grid-row:2"><b>DuckDB</b><small>D1_1</small></div><div class="t" style="grid-column:2/3;grid-row:3"><b>CDC + MERGE</b><small>D1_4</small></div><div class="t" style="grid-column:3/4;grid-row:3"><b>Parquet</b><small>D1_2</small></div><div class="t" style="grid-column:4/6;grid-row:3"><b>Polars</b><small>D2_1</small></div><div class="t" style="grid-column:6/7;grid-row:3"><b>Semantic layer</b><small>D4_4</small></div><div class="t" style="grid-column:2/3;grid-row:4"><b>Streaming</b><small>D3_3</small></div><div class="t" style="grid-column:3/4;grid-row:4"><b>Iceberg</b><small>D3_1</small></div><div class="t" style="grid-column:4/6;grid-row:4"><b>dbt</b><small>D2_2 · D2_3</small></div><div class="t" style="grid-column:6/7;grid-row:4"><b>Embeddings</b><small>D4_4</small></div><div class="t" style="grid-column:4/5;grid-row:5"><b>Spark</b><small>D3_2</small></div><div class="t" style="grid-column:5/6;grid-row:5"><b>Pandera</b><small>D2_4</small></div><div class="t" style="grid-column:5/6;grid-row:6"><b>Contracts</b><small>D4_2</small></div><div class="b" style="grid-column:2/-1;grid-row:7"><b>Orchestrate</b><span>Dagster: assets, schedules, checks</span><small>D4_1</small></div><div class="b" style="grid-column:2/-1;grid-row:8"><b>Observe</b><span>freshness, volume, schema, distribution, lineage</span><small>D4_2</small></div><div class="b" style="grid-column:2/-1;grid-row:9"><b>Govern</b><span>PDPL, masking, access</span><small>D4_3</small></div></div>',
-'<strong>You are here:</strong> every session starts from this map, with its stage marked.',
-'This is the map for the whole course. Walk it left to right once: sources, ingest, store, transform, test, serve, with orchestration, observability and governance across all of them. Point out the tools that span stages: DuckDB is the SQL engine almost everywhere; Polars and dbt both transform and test. The codes say in which session each tool is taught. Every tool notebook opens with this map, drawn by de_viz (V.platform_map) with its stage highlighted.');
-
-add('10 / One order’s journey','From the app to a clean record','Order 5043883: a Riyadh customer buys coffee and cucumbers at 01:35 on 28 September.',
-svg(path('M440 160 L500 160','em')+path('M945 160 L1005 160','em'))+box('App database','<div class="data-row"><span>order_id</span><span>5043883</span></div><div class="data-row"><span>store_id</span><span>RUH-05</span></div><div class="data-row"><span>status</span><span>delivered</span></div><div class="data-row"><span>created_at</span><span>&#39;09-27 22:35:37&#39;</span></div>',0,10,430,'','j-app','orders table · SQLite')+box('raw.orders','<div class="data-row"><span>order_id</span><span>5043883</span></div><div class="data-row"><span>status</span><span>delivered</span></div><div class="data-row"><span>created_at</span><span>&#39;09-27 22:35:37&#39;</span></div><div class="data-row"><span>_loaded_at</span><span>2026-10-01</span></div>',505,10,430,'bronze','j-raw','Bronze · loaded by dlt')+box('stg_orders','<div class="data-row"><span>created_at_utc</span><span>09-27 22:35:37</span></div><div class="data-row"><span>created_at_riyadh</span><span>09-28 01:35:37</span></div><div class="data-row"><span>order_date</span><span>2026-09-28</span></div><div class="data-row"><span>delivery_fee</span><span>9.00</span></div>',1010,10,430,'silver','j-stg','Silver · dbt staging')+note('The app’s current row,<br>timestamps as UTC text',30,345,'',400)+note('Kept as sent, plus<br>when it was loaded',535,345,'red',400)+note('Typed, in Riyadh time:<br>it now belongs to 28 Sep',1040,345,'teal',400),
-'<strong>Bronze keeps the evidence.</strong> Silver fixes types and time zones once, for everyone.',
-'Real rows from the course data (data/raw/qafila_oltp.sqlite and the warehouse after dbt build; dates shortened to month-day). The order was placed at 22:35 UTC on 27 September, which is 01:35 on 28 September in Riyadh. A report grouped by the UTC date puts it on the wrong day. stg_orders converts once (the to_riyadh macro), so every model downstream agrees. Labs: 1.3 loads raw, 2.1 and 2.3 build silver.');
-
-add('10 / One order’s journey','From a clean record to an answer','The same order becomes a fact, then one of 320 in a daily mart, then part of an answer.',
-svg(path('M440 160 L500 160','em')+path('M945 160 L1005 160','em'))+box('fct_orders','<div class="data-row"><span>lines · units</span><span>2 · 3</span></div><div class="data-row"><span>items_amount</span><span>80.50</span></div><div class="data-row"><span>paid_amount</span><span>89.50</span></div><div class="data-row"><span>delivery_minutes</span><span>19.3</span></div>',0,10,430,'gold','j-fct','Gold · one row per order')+box('mart_daily_city_sales','<div class="data-row"><span>order_date</span><span>2026-09-28</span></div><div class="data-row"><span>city</span><span>Riyadh</span></div><div class="data-row"><span>delivered_orders</span><span>320</span></div><div class="data-row"><span>revenue_sar</span><span>52,090.75</span></div>',505,10,430,'gold','j-mart','Gold · one row per day and city')+box('The answer','<p style="font-size:21px">“What did Riyadh sell on 28 September?”</p><div class="number" style="font-size:44px;margin:18px 0 12px">52,090.75 SAR</div><p style="font-size:19px">320 delivered orders, delivery fees excluded</p>',1010,10,430,'','j-answer','Serve · dashboard or AI question')+note('Joined with its items,<br>payment and delivery',30,345,'',400)+note('Our order adds 80.50:<br>revenue excludes the fee',535,345,'teal',400)+note('Every number traces back<br>to rows in bronze',1040,345,'',400),
-'<strong>Gold applies the definition.</strong> The same number on the dashboard and in the AI answer.',
-'fct_orders joins the two order lines (1 × Sahra Cucumbers at 4.74, 2 × Al Waha Arabic Coffee at 37.88), the payment (89.50 = items + 9.00 delivery fee, captured) and the delivery events (delivered after 19.3 minutes, inside the SLA). The mart counts the order on 28 September in Riyadh and adds 80.50 to revenue: Qafila’s revenue definition excludes delivery fees. Ask: if a refund arrived tomorrow, which tables change? (raw.payments by merge, then everything downstream on the next dbt build.) Labs: 2.2 and 2.3 build gold, 4.4 serves it to an AI assistant.');
-
-add('11 / Further reading','The architecture responds to a need','Qafila is fictional. The design questions apply to real data platforms.',
-`<div class="references"><div><h3>The questions to take away</h3><p>What evidence must we retain?</p><p>Who needs to query it?</p><p>What does each dataset promise?</p><p class="note">A warehouse, lake, or lakehouse can fit.<br>Choose with the workload and the team.</p></div><div><h3>Sources and continuation</h3><div class="reference-list"><a href="${sources.reference}" target="_blank" rel="noopener">Data with Baraa · Visual reference</a><a href="${sources.aws}" target="_blank" rel="noopener">AWS · Warehouse and lake comparison</a><a href="${sources.lakehouse}" target="_blank" rel="noopener">Databricks · Lakehouse and data layers</a><a href="${sources.iceberg}" target="_blank" rel="noopener">Apache Iceberg · Reliable table updates</a><a href="../index.html">Back to the course page · Session 1.1</a></div></div></div>`,
-'The next lab turns these promises into data transformations and checks.',
-'The video provides the visual teaching reference: hand-drawn architecture, stable sources and consumers, progressive introduction of platform layers. The illustrations and Qafila narrative are original. Text and diagram layout remain editable in the source.');
-
-scenes.forEach((s,i)=>{
- const el=document.createElement('section');el.className='scene';el.dataset.slide=String(i+1);el.setAttribute('aria-label',`${i+1}. ${s.title}`);
-const heading=s.cover?'<div class="cover-title"><p class="eyebrow">MODERN DATA ENGINEERING</p><h1>Warehouse,<br>lake,<br><span class="teal">lakehouse</span></h1><p class="lead">One company.<br>A changing architecture.</p></div>':`<div class="heading"><h2>${s.title}</h2><p class="subtitle">${s.subtitle}</p></div>`;
- if(s.cover)s.body=s.body.replace('viewBox="0 0 1440 510"','viewBox="0 0 730 485"');
- el.innerHTML=`<header><div class="brand"><img src="../assets/img/academy.svg" alt="SDAIA Academy"><span>QAFILA / DATA PLATFORM STORY</span></div><span class="chapter">${s.chapter}</span></header>${heading}<div class="board ${s.cover?'cover-board':''}">${s.body}</div><p class="takeaway"><span class="signal" aria-hidden="true"></span><span>${s.takeaway}</span></p><footer><span>SDAIA Academy · Modern Data Engineering</span><span>${String(i+1).padStart(2,'0')} / ${scenes.length}</span></footer>`;root.appendChild(el);
-});
-const els=[...root.querySelectorAll('.scene')],notes=document.getElementById('notes-panel');let index=-1,overview=false;
-const progress=document.createElement('div');progress.id='progress';root.appendChild(progress);
-function fit(){if(!overview)root.style.transform=`translate(-50%,-50%) scale(${Math.min(innerWidth/1600,innerHeight/900)})`;}
-function show(n,update=true){
- const next=Math.max(0,Math.min(els.length-1,n)),oldIds=new Set(index<0?[]:[...els[index].querySelectorAll('[data-id]')].map(e=>e.dataset.id));index=next;
- els.forEach((e,j)=>{e.classList.toggle('active',j===index);e.setAttribute('aria-hidden',String(j!==index));e.inert=j!==index;});
- els[index].querySelectorAll('[data-id]').forEach(e=>e.classList.toggle('new',!oldIds.has(e.dataset.id)));
- if(update)history.replaceState(null,'',`#${index+1}`);progress.style.width=`${(index+1)/els.length*100}%`;
- document.getElementById('previous').disabled=index===0;document.getElementById('next').disabled=index===els.length-1;
- notes.innerHTML=`<h3>${index+1}. ${scenes[index].title}</h3><p>${scenes[index].notes}</p><p style="font-size:16px;margin-top:18px">${scenes[index].refs.map(k=>`<a href="${sources[k]}" target="_blank" rel="noopener">${k}</a>`).join(' · ')}</p>`;
- document.getElementById('live-status').textContent=`Slide ${index+1} of ${els.length}: ${scenes[index].title}`;
+function start({brand,sources={}}){
+ scenes.forEach((s,i)=>{
+  const el=document.createElement('section');el.className='scene';el.dataset.slide=String(i+1);el.setAttribute('aria-label',`${i+1}. ${s.title}`);
+ const heading=s.cover?`<div class="cover-title">${s.cover}</div>`:`<div class="heading"><h2>${s.title}</h2><p class="subtitle">${s.subtitle}</p></div>`;
+  if(s.cover)s.body=s.body.replace('viewBox="0 0 1440 510"','viewBox="0 0 730 485"');
+  el.innerHTML=`<header><div class="brand"><img src="../assets/img/academy.svg" alt="SDAIA Academy"><span>${brand}</span></div><span class="chapter">${s.chapter}</span></header>${heading}<div class="board ${s.cover?'cover-board':''}"><div class="camera">${s.body}</div></div><p class="takeaway"><span class="signal" aria-hidden="true"></span><span>${s.takeaway}</span></p><footer><span>SDAIA Academy · Modern Data Engineering</span><span>${String(i+1).padStart(2,'0')} / ${scenes.length}</span></footer>`;root.appendChild(el);
+ });
+ const els=[...root.querySelectorAll('.scene')],notes=document.getElementById('notes-panel');let index=-1,overview=false;
+ const progress=document.createElement('div');progress.id='progress';root.appendChild(progress);
+ function fit(){if(!overview)root.style.transform=`translate(-50%,-50%) scale(${Math.min(innerWidth/1600,innerHeight/900)})`;}
+ 
+ // Transitions between neighbouring slides. The old slide stays on top while its pieces fade, glide or zoom away.
+ const MOVE=750,ZOOM=1000,EASE='cubic-bezier(.45,0,.2,1)',BOARD_W=1440,BOARD_H=510;
+ let settle=null;
+ function settleTransition(){if(settle){const done=settle;settle=null;done();}}
+ const reducedMotion=()=>document.body.classList.contains('checking')||matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const geometry=e=>e.style.left&&e.style.top&&e.style.width?{left:e.style.left,top:e.style.top,width:e.style.width}:null;
+ function rectOf(camera,id){
+  const e=camera.querySelector(`[data-id="${id}"]`);if(!e)return null;
+  if(e instanceof SVGGraphicsElement){const b=e.getBBox();return {x:b.x,y:b.y,w:b.width,h:b.height};}
+  return {x:e.offsetLeft,y:e.offsetTop,w:e.offsetWidth,h:e.offsetHeight};
+ }
+ function morph(ca,cb,{run,hide,fadeOut,fadeIn}){
+  const sa=ca.querySelector(':scope>svg.wires'),sb=cb.querySelector(':scope>svg.wires');
+  const pathKey=p=>p.dataset.id||p.getAttribute('class')+p.getAttribute('d');
+  const oldPaths=new Map(sa?[...sa.querySelectorAll('path.wire,path.enclosure')].map(p=>[pathKey(p),p]):[]);
+  if(sb)for(const p of sb.querySelectorAll('path.wire,path.enclosure')){
+   const o=oldPaths.get(pathKey(p));
+   if(!o){fadeIn(p,MOVE*.55);continue;}
+   oldPaths.delete(pathKey(p));hide(o);
+   const d0=o.getAttribute('d'),d1=p.getAttribute('d');
+   if(d0!==d1)run(p,[{d:`path("${d0}")`},{d:`path("${d1}")`}]);
+  }
+  oldPaths.forEach(fadeOut);
+  const pieces=c=>[...c.children].filter(e=>!e.matches('svg.wires'));
+  const olds=pieces(ca),byId=new Map(olds.filter(e=>e.dataset.id).map(e=>[e.dataset.id,e])),byHtml=new Map(olds.map(e=>[e.outerHTML,e])),used=new Set();
+  for(const n of pieces(cb)){
+   const o=(n.dataset.id&&byId.get(n.dataset.id))||byHtml.get(n.outerHTML);
+   if(!o||used.has(o)){fadeIn(n,MOVE*.5);continue;}
+   used.add(o);
+   if(o.outerHTML===n.outerHTML){hide(o);continue;}
+   const g0=geometry(o),g1=geometry(n);
+   if(o.className===n.className&&o.innerHTML===n.innerHTML){hide(o);if(g0&&g1)run(n,[g0,g1]);continue;}
+   // Same id, new content: both copies travel together while one fades into the other.
+   if(g0&&g1){run(o,[{...g0,opacity:1},{...g1,opacity:0}]);run(n,[{...g0,opacity:0},{...g1,opacity:1}]);}
+   else run(o,[{opacity:1},{opacity:0}],{duration:500,easing:'ease'});
+  }
+  olds.forEach(o=>{if(!used.has(o))fadeOut(o);});
+ }
+ function zoom(outer,inner,id,entering,run){
+  const r=rectOf(outer,id);if(!r||!r.w||!r.h)return false;
+  const s=Math.min(BOARD_W/r.w,BOARD_H/r.h),cx=r.x+r.w/2,cy=r.y+r.h/2;
+  const through=`translate(${BOARD_W/2-cx*s}px,${BOARD_H/2-cy*s}px) scale(${s})`,inside=`translate(${cx-BOARD_W/2/s}px,${cy-BOARD_H/2/s}px) scale(${1/s})`,o={duration:ZOOM};
+  if(entering){run(outer,[{transform:'none',opacity:1},{opacity:1,offset:.35},{opacity:0,offset:.6},{transform:through,opacity:0}],o);run(inner,[{transform:inside,opacity:0},{opacity:0,offset:.4},{opacity:1,offset:.75},{transform:'none',opacity:1}],o);}
+  else{run(inner,[{transform:'none',opacity:1},{opacity:0,offset:.35},{transform:inside,opacity:0}],o);run(outer,[{transform:through,opacity:0},{opacity:0,offset:.25},{opacity:1,offset:.6},{transform:'none',opacity:1}],o);}
+  return true;
+ }
+ function transition(a,b){
+  const A=els[a],B=els[b],anims=[],hidden=[];
+  const run=(el,frames,o={})=>anims.push(el.animate(frames,{duration:MOVE,easing:EASE,fill:'both',...o}));
+  const hide=el=>{el.style.visibility='hidden';hidden.push(el);};
+  const fadeOut=el=>run(el,[{opacity:1},{opacity:0}],{duration:300,easing:'ease'});
+  const fadeIn=(el,delay)=>run(el,[{opacity:0},{opacity:1}],{duration:450,delay,easing:'ease'});
+  [A,B].forEach(s=>s.querySelectorAll('.new').forEach(e=>e.classList.remove('new')));
+  A.classList.add('leaving');
+  hide(A.querySelector('header'));hide(A.querySelector('footer'));
+  // Text never overlaps: the old words leave before the new ones arrive.
+  const ch0=A.querySelector('.chapter'),ch1=B.querySelector('.chapter');if(ch0.innerHTML!==ch1.innerHTML)fadeIn(ch1,200);
+  for(const sel of ['.heading','.cover-title','.takeaway']){const o=A.querySelector(sel),n=B.querySelector(sel);if(o&&n&&o.innerHTML===n.innerHTML)hide(o);else{if(o)run(o,[{opacity:1},{opacity:0}],{duration:180,easing:'ease-in'});if(n)fadeIn(n,200);}}
+  const ca=A.querySelector('.camera'),cb=B.querySelector('.camera'),boards=[ca.parentElement,cb.parentElement];
+  // The later slide declares the zoom; its outer board is the one that holds the target element.
+  const z=scenes[Math.max(a,b)].zoom,outerIsOld=z&&(z.in?a<b:a>b);
+  if(z){boards.forEach(e=>e.classList.add('clip'));if(!zoom(outerIsOld?ca:cb,outerIsOld?cb:ca,z.in||z.out,outerIsOld,run)){boards.forEach(e=>e.classList.remove('clip'));morph(ca,cb,{run,hide,fadeOut,fadeIn});}}
+  else morph(ca,cb,{run,hide,fadeOut,fadeIn});
+  const done=()=>{anims.forEach(x=>x.cancel());hidden.forEach(e=>{e.style.visibility='';});A.classList.remove('leaving');boards.forEach(e=>e.classList.remove('clip'));};
+  settle=done;
+  Promise.all(anims.map(x=>x.finished)).then(()=>{if(settle===done)settleTransition();},()=>{});
+ }
+ function show(n,update=true){
+  settleTransition();
+  const previous=index,next=Math.max(0,Math.min(els.length-1,n)),oldIds=new Set(index<0?[]:[...els[index].querySelectorAll('[data-id]')].map(e=>e.dataset.id));index=next;
+  els.forEach((e,j)=>{e.classList.toggle('active',j===index);e.setAttribute('aria-hidden',String(j!==index));e.inert=j!==index;});
+  if(previous>=0&&Math.abs(next-previous)===1&&!overview&&!reducedMotion())transition(previous,next);
+  else els[index].querySelectorAll('[data-id]').forEach(e=>e.classList.toggle('new',!oldIds.has(e.dataset.id)));
+  if(update)history.replaceState(null,'',`#${index+1}`);progress.style.width=`${(index+1)/els.length*100}%`;
+  document.getElementById('previous').disabled=index===0;document.getElementById('next').disabled=index===els.length-1;
+  notes.innerHTML=`<h3>${index+1}. ${scenes[index].title}</h3><p>${scenes[index].notes}</p><p style="font-size:16px;margin-top:18px">${scenes[index].refs.filter(k=>sources[k]).map(k=>`<a href="${sources[k]}" target="_blank" rel="noopener">${k}</a>`).join(' · ')}</p>`;
+  document.getElementById('live-status').textContent=`Slide ${index+1} of ${els.length}: ${scenes[index].title}`;
+ }
+ function toggleNotes(){document.getElementById('notes').setAttribute('aria-expanded',String(notes.classList.toggle('open')));}
+ function toggleOverview(){overview=!overview;document.body.classList.toggle('overview',overview);if(overview){root.style.transform='';els.forEach(e=>{e.inert=false;e.setAttribute('aria-hidden','false');});}else{show(index);fit();}}
+ function fullscreen(){if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>{});}
+ document.getElementById('previous').onclick=()=>show(index-1);document.getElementById('next').onclick=()=>show(index+1);document.getElementById('notes').onclick=toggleNotes;document.getElementById('overview').onclick=toggleOverview;document.getElementById('fullscreen').onclick=fullscreen;
+ els.forEach((e,i)=>e.addEventListener('click',()=>{if(overview){toggleOverview();show(i);}}));
+ document.querySelectorAll('.quiz-option').forEach(b=>b.addEventListener('click',()=>{const p=b.closest('.scene'),q=scenes[p.dataset.slide-1].quiz;p.querySelectorAll('.quiz-option').forEach(x=>x.classList.remove('correct','wrong'));const correct=b.dataset.answer===q.answer;b.classList.add(correct?'correct':'wrong');p.querySelector('.feedback').textContent=correct?q.right:q.wrong;}));
+ document.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;if(e.target.closest('button')&&['Enter',' '].includes(e.key))return;if(['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();show(index+1);}else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();show(index-1);}else if(e.key==='Home'){e.preventDefault();show(0);}else if(e.key==='End'){e.preventDefault();show(els.length-1);}else if(e.key.toLowerCase()==='n')toggleNotes();else if(e.key.toLowerCase()==='o')toggleOverview();else if(e.key.toLowerCase()==='f')fullscreen();else if(e.key==='Escape'){if(overview)toggleOverview();notes.classList.remove('open');document.getElementById('notes').setAttribute('aria-expanded','false');}});
+ let touchX=null;document.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;},{passive:true});document.addEventListener('touchend',e=>{if(touchX!==null){const dx=e.changedTouches[0].clientX-touchX;if(Math.abs(dx)>65)show(index+(dx<0?1:-1));touchX=null;}},{passive:true});
+ window.addEventListener('resize',fit);window.addEventListener('hashchange',()=>show((parseInt(location.hash.slice(1),10)||1)-1,false));fit();show((parseInt(location.hash.slice(1),10)||1)-1);
+ if(location.search.includes('check')){const initial=index,issues=[];for(let i=0;i<els.length;i++){show(i,false);const r=els[i].getBoundingClientRect();for(const e of els[i].querySelectorAll('.figure,.annotation,.label,.stage-box,.heading,.takeaway,.compare-col,.quiz-option,.feedback,.quiz-instruction,.references,.platform,.platform>div,.mapping,.trap')){const b=e.getBoundingClientRect();if(!b.width||!b.height)continue;if(b.left<r.left-1||b.right>r.right+1||b.top<r.top-1||b.bottom>r.bottom+1)issues.push(`Slide ${i+1}: ${e.className} outside canvas`);if(e.scrollWidth>e.clientWidth+3)issues.push(`Slide ${i+1}: ${e.className} overflow`);}}show(initial,false);window.STORY_LAYOUT_CHECK={slides:els.length,issues};const report=document.createElement('output');report.id='check-report';report.style.cssText='position:fixed;left:8px;bottom:8px;font:12px monospace;z-index:99;background:white;padding:5px';report.textContent=`CHECK ${els.length} slides: ${issues.length?issues.join('; '):'OK'}`;document.body.appendChild(report);}
 }
-function toggleNotes(){document.getElementById('notes').setAttribute('aria-expanded',String(notes.classList.toggle('open')));}
-function toggleOverview(){overview=!overview;document.body.classList.toggle('overview',overview);if(overview){root.style.transform='';els.forEach(e=>{e.inert=false;e.setAttribute('aria-hidden','false');});}else{show(index);fit();}}
-function fullscreen(){if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>{});}
-document.getElementById('previous').onclick=()=>show(index-1);document.getElementById('next').onclick=()=>show(index+1);document.getElementById('notes').onclick=toggleNotes;document.getElementById('overview').onclick=toggleOverview;document.getElementById('fullscreen').onclick=fullscreen;
-els.forEach((e,i)=>e.addEventListener('click',()=>{if(overview){toggleOverview();show(i);}}));
-document.querySelectorAll('.quiz-option').forEach(b=>b.addEventListener('click',()=>{const p=b.closest('.scene');p.querySelectorAll('.quiz-option').forEach(x=>x.classList.remove('correct','wrong'));const correct=b.dataset.answer==='B';b.classList.add(correct?'correct':'wrong');p.querySelector('.feedback').textContent=correct?'Yes. Readers use one committed table version.':'That does not make a multi-file update atomic. Try again.';}));
-document.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;if(e.target.closest('button')&&['Enter',' '].includes(e.key))return;if(['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();show(index+1);}else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();show(index-1);}else if(e.key==='Home'){e.preventDefault();show(0);}else if(e.key==='End'){e.preventDefault();show(els.length-1);}else if(e.key.toLowerCase()==='n')toggleNotes();else if(e.key.toLowerCase()==='o')toggleOverview();else if(e.key.toLowerCase()==='f')fullscreen();else if(e.key==='Escape'){if(overview)toggleOverview();notes.classList.remove('open');document.getElementById('notes').setAttribute('aria-expanded','false');}});
-let touchX=null;document.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;},{passive:true});document.addEventListener('touchend',e=>{if(touchX!==null){const dx=e.changedTouches[0].clientX-touchX;if(Math.abs(dx)>65)show(index+(dx<0?1:-1));touchX=null;}},{passive:true});
-window.addEventListener('resize',fit);window.addEventListener('hashchange',()=>show((parseInt(location.hash.slice(1),10)||1)-1,false));fit();show((parseInt(location.hash.slice(1),10)||1)-1);
-if(location.search.includes('check')){const initial=index,issues=[];for(let i=0;i<els.length;i++){show(i,false);const r=els[i].getBoundingClientRect();for(const e of els[i].querySelectorAll('.figure,.annotation,.label,.stage-box,.heading,.takeaway,.compare-col,.quiz-option,.feedback,.quiz-instruction,.references,.platform,.platform>div,.mapping,.trap')){const b=e.getBoundingClientRect();if(!b.width||!b.height)continue;if(b.left<r.left-1||b.right>r.right+1||b.top<r.top-1||b.bottom>r.bottom+1)issues.push(`Slide ${i+1}: ${e.className} outside canvas`);if(e.scrollWidth>e.clientWidth+3)issues.push(`Slide ${i+1}: ${e.className} overflow`);}}show(initial,false);window.STORY_LAYOUT_CHECK={slides:els.length,issues};const report=document.createElement('output');report.id='check-report';report.style.cssText='position:fixed;left:8px;bottom:8px;font:12px monospace;z-index:99;background:white;padding:5px';report.textContent=`CHECK ${els.length} slides: ${issues.length?issues.join('; '):'OK'}`;document.body.appendChild(report);}
+window.Story={art,label,note,path,outline,svg,box,tool,platform,add,start};
 })();
