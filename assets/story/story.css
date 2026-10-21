@@ -43,3 +43,12 @@ body.overview{overflow:auto;background:#e5e9e6}body.overview #stage{position:sta
 .platform .met{opacity:.35}.platform .fresh{border:2.4px solid #348f8d;background:#dcf0e8;box-shadow:0 2px 10px #2f8f8526}.platform .t.fresh{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px}.platform .t.fresh .what{font-size:14.5px;color:#2f6266}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media print{@page{size:1600px 900px;margin:0}html,body{overflow:visible;width:auto;height:auto;background:white}#stage{position:static;transform:none!important;width:1600px;height:auto;box-shadow:none}.scene{display:block!important;position:relative;width:1600px;height:900px;break-after:page;print-color-adjust:exact;-webkit-print-color-adjust:exact}#toolbar,#notes-panel,#progress{display:none!important}}
+/* Event records on a log (D3_3, D3_4): one card per event, coloured by event type. */
+.label.evt{height:70px;padding-top:8px;text-align:center;border:2px solid #91a9b9;border-radius:4px 8px 5px 3px;background:#fff;font-weight:400}.evt b{display:block;font:20px/1.2 'Cascadia Code',Consolas,monospace}.evt span{display:block;font-size:16px;color:#526773;margin-top:5px}
+.evt.assigned{border-color:#8faac6;background:#e8f0fc}.evt.picked{border-color:#c6ad5d;background:#fff2c9}.evt.way{border-color:#bd9973;background:#f9ecda}.evt.delivered{border-color:#70b5a9;background:#e0f2eb}
+.evt.ghost{border:2px dashed #b8c8c3;background:none;color:#8a979c}.evt.dup,.evt.twice{border:2.4px dashed #c46558;background:#fbeee9}.evt.lost{opacity:.4;border-style:dashed}.evt.lost b,.evt.lost span{text-decoration:line-through}
+.label.off,.label.tick{font:17px 'Cascadia Code',Consolas,monospace;color:var(--muted);text-align:center;font-weight:400}.label.ptr{font-size:18px;font-weight:650;text-align:center}.ptr.sla{color:#23817c}.ptr.fraud{color:#ac713b}.ptr.saved{color:#517eaf}
+.label.count{text-align:center;font-size:21px;font-weight:400;color:#526773}.label.count b{font:30px var(--hand);color:var(--ink)}.label.count.closed b{color:#23817c}
+.wire.thin{stroke-width:1.5;stroke:#8d9ba3}.wire.axis{stroke-width:2;stroke:#61717c}.enclosure.closed{fill:#e0f2eb80;stroke:#70b5a9}
+.label.chip{background:var(--paper);border-radius:4px}
+.mapping.compact td{padding:11px 18px}
