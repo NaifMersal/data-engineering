@@ -24,6 +24,8 @@ New to Polars? Work through `tools/polars.ipynb` before Day 1 too (self-paced, a
 
 New to dbt? Before Lab 2.3, work through [`tools/dbt.ipynb`](tools/dbt.ipynb) (guided, about 100 minutes). Start with an empty project folder and a few teaching rows, write the configuration and models yourself, and read the SQL dbt generates from them. Step-by-step players replay each dbt run on the project's graph and an incremental `delete+insert` row by row, then compare it with `merge`; you break an incremental model on purpose and watch a failing test skip the report. Five short exercises along the way, and a tested city sales report at the end. This is an extended walkthrough outside the regular 25-minute session lab.
 
+Session 1.3 is taught from [`tools/dlt.ipynb`](tools/dlt.ipynb), with no slides: a loader written by hand breaks in four ways (retries, refunds, a new field, the cursor), then dlt does the same job while you read the files and tables it produces. Write dispositions, an incremental cursor whose state survives deleting the pipeline folder, a late record that slips past the cursor, nested data, variant columns and schema contracts; three short exercises. Lab 1.3 then applies it to the real payments API and app database.
+
 **Lab 3.2 (Spark)** needs Java 17+. On Colab the lab installs it. Locally, install a JDK (for example [Temurin 21](https://adoptium.net/)), set `JAVA_HOME`, then `uv sync --extra spark`. On native Windows, Spark also needs `winutils.exe` to write files, so Windows users should run Lab 3.2 on Colab (or in WSL).
 
 Set `DE_QUICK=1` to shrink the heavier workloads. Useful on slow laptops and for checking that notebooks run.
@@ -37,6 +39,7 @@ Set `DE_QUICK=1` to shrink the heavier workloads. Useful on slow laptops and for
 | 0 | Prerequisite: Polars, one idea at a time (self-paced) | [`tools/polars.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/polars.ipynb) | CPU |
 | 1 | Platform tour | [`D1_1_platform_tour.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_1_platform_tour.ipynb) | CPU |
 | 1 | Files & columnar storage | [`D1_2_files_parquet.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_2_files_parquet.ipynb) | CPU |
+| 1 | Walkthrough: dlt, from a hand-written loader to an incremental pipeline (taught before Lab 1.3) | [`tools/dlt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dlt.ipynb) | CPU |
 | 1 | Batch ingestion (dlt) | [`D1_3_ingestion_dlt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_3_ingestion_dlt.ipynb) | CPU |
 | 1 | CDC & SCD2 | [`D1_4_cdc_merge_scd.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_4_cdc_merge_scd.ipynb) | CPU |
 | 2 | Bronze → silver (DuckDB, Polars) | [`D2_1_bronze_to_silver.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_1_bronze_to_silver.ipynb) | CPU |
@@ -59,6 +62,7 @@ Exercises are marked **✏️ Exercise** and raise `NotImplementedError` until y
 
 Labs don't depend on each other: from Day 2 on, each lab starts from `U.build_warehouse()`, the end state of the Day 1 ingestion labs (`warehouse/qafila.duckdb`, schema `raw`). Each lab writes its own outputs to `artifacts/<lab>/`.
 
+The dlt walkthrough is self-contained too (`artifacts/tools_dlt/`), apart from one look at the local payments API.
 The guided dbt walkthrough is self-contained: it creates its own tiny teaching database and project in `artifacts/tools_dbt/`, without using the shared warehouse. Rerunning its workspace setup cell resets only that walkthrough's generated files. Its student notebook has five exercises; the reference notebook in `solutions/tools/` includes their answers.
 
 ## Data
@@ -99,3 +103,4 @@ uv run python _tools/py2nb.py                    # rebuild all (student + soluti
 uv run python _tools/py2nb.py D3_1_iceberg_lakehouse   # rebuild one
 uv run python _tools/py2nb.py dbt                # one tool walkthrough: _src/tools/dbt.py → tools/ + solutions/tools/
 ```
+A markdown cell headed `# %% [markdown] 🎓` is an instructor note: it goes into the solution notebook only.

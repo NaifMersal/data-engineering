@@ -66,6 +66,130 @@ def _fmt(v) -> str:
 
 
 # ---------------------------------------------------------------------------
+# The Qafila platform map · "you are here" at the top of every walkthrough
+# ---------------------------------------------------------------------------
+
+STAGES = ["sources", "ingest", "store", "transform", "test", "serve"]
+SOURCES = [("App database", "qafila_oltp.sqlite"), ("Payments API", "pages, cursor, 429s"),
+           ("CDC feed", "inserts, updates, deletes"), ("Click events", "a stream"),
+           ("Supplier files", "weekly CSVs"), ("Reviews", "free text")]
+# (key, name, first stage, last stage, what it does here, sessions). Order sets the packing: wide tools first.
+TOOLS = [
+    ("dlt", "dlt", "ingest", "ingest", "incremental loads, schema drift", "D1_3"),
+    ("duckdb", "DuckDB", "store", "serve", "the SQL engine in every lab", "D1_1"),
+    ("cdc", "CDC + MERGE", "ingest", "ingest", "changes, deletes, SCD2", "D1_4"),
+    ("parquet", "Parquet", "store", "store", "columnar files", "D1_2"),
+    ("polars", "Polars", "transform", "test", "DataFrames, lazy plans, checks", "D2_1"),
+    ("semantic", "Semantic layer", "serve", "serve", "metrics defined once", "D4_4"),
+    ("streaming", "Streaming", "ingest", "ingest", "events as they happen", "D3_3 · D3_4"),
+    ("iceberg", "Iceberg", "store", "store", "tables on files, time travel", "D3_1"),
+    ("dbt", "dbt", "transform", "test", "models, tests, docs, lineage", "D2_2 · D2_3"),
+    ("ai", "Embeddings", "serve", "serve", "search, text-to-SQL", "D4_4"),
+    ("spark", "Spark", "transform", "transform", "the same work on a cluster", "D3_2"),
+    ("pandera", "Pandera", "test", "test", "schemas for DataFrames", "D2_4"),
+    ("contracts", "Contracts", "test", "test", "ODCS: what consumers rely on", "D4_2"),
+]
+BANDS = [("dagster", "Orchestrate", "Dagster: assets, schedules, checks", "D4_1"),
+         ("observe", "Observe", "freshness, volume, schema, distribution, lineage", "D4_2"),
+         ("govern", "Govern", "PDPL, masking, access", "D4_3")]
+
+_MAP_CSS = """
+#%%ID%% {font-family: system-ui, sans-serif; color: %%INK%%; background: #fff; border: 1px solid %%GRID%%;
+     border-radius: 8px; padding: 12px 14px; max-width: 100%; overflow-x: auto; color-scheme: light}
+#%%ID%% .pm-here {font-size: 13.5px; margin: 0 0 10px}
+#%%ID%% .pm-g {display: grid; grid-template-columns: repeat(6, minmax(118px, 1fr)); gap: 5px; min-width: 760px;
+           position: relative}
+#%%ID%% .pm-col {border-radius: 6px; background: %%TINT%%; z-index: 0}
+#%%ID%% .pm-h {z-index: 1; font-weight: bold; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em;
+           color: %%MUTED%%; padding: 6px 18px 6px 10px; background: #f4f2ec;
+           clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%)}
+#%%ID%% .pm-h:first-child {clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%)}
+#%%ID%% .pm-h.on {background: %%NAVY%%; color: #fff}
+#%%ID%% .pm-t, #%%ID%% .pm-s, #%%ID%% .pm-b {z-index: 1; border: 1px solid %%FADE%%; border-radius: 6px;
+           background: #fff; padding: 4px 8px; font-size: 12px; line-height: 1.3}
+#%%ID%% .pm-t b, #%%ID%% .pm-b b {font-size: 12.5px}
+#%%ID%% .pm-t small, #%%ID%% .pm-s small, #%%ID%% .pm-b small {display: block; color: %%MUTED%%; font-size: 11px}
+#%%ID%% .pm-t i, #%%ID%% .pm-b i {float: right; font-style: normal; font-size: 10.5px; color: %%MUTED%%;
+           font-variant-numeric: tabular-nums; margin-left: 6px}
+#%%ID%% .pm-s {border-style: dashed}
+#%%ID%% .pm-b {background: #f9f8f4}
+#%%ID%% .pm-b b {display: inline-block; min-width: 92px}
+#%%ID%% .pm-b small {display: inline}
+#%%ID%% .on.pm-t, #%%ID%% .on.pm-b {background: %%NAVY%%; border-color: %%NAVY%%; color: #fff}
+#%%ID%% .on.pm-t small, #%%ID%% .on.pm-t i, #%%ID%% .on.pm-b small, #%%ID%% .on.pm-b i {color: #dfe5ef}
+#%%ID%% .on.pm-t b::before, #%%ID%% .on.pm-b b::before {content: "▸ "}
+#%%ID%% .dim {opacity: .4}
+"""
+
+
+def platform_map(tool=None, stage=None, title=None):
+    """The Qafila platform: sources → ingest → store → transform → test → serve, and the tools in each stage.
+
+    `tool` (a key from `TOOLS` / `BANDS`, or a list of them) is drawn filled, and the stages it covers are marked
+    "you are here"; `stage` marks stages directly. Tools outside the marked stages fade, so the map still shows the
+    whole platform but points at one part of it.
+    """
+    import html
+    import uuid
+
+    from IPython.display import HTML
+
+    tools = [tool] if isinstance(tool, str) else list(tool or [])
+    known = {t[0] for t in TOOLS} | {b[0] for b in BANDS}
+    if unknown := set(tools) - known:
+        raise ValueError(f"unknown tool {sorted(unknown)}; pick from {sorted(known)}")
+    stages = [stage] if isinstance(stage, str) else list(stage or [])
+    if unknown := set(stages) - set(STAGES):
+        raise ValueError(f"unknown stage {sorted(unknown)}; pick from {STAGES}")
+    for key, _, a, b, *_ in TOOLS:
+        if key in tools and not stage:
+            stages += STAGES[STAGES.index(a):STAGES.index(b) + 1]
+    marked = set(stages)
+    focus = bool(tools or marked)
+    esc = html.escape
+
+    rows, cells = [], []   # rows: the set of grid columns already used in each tool row
+    for key, name, a, b, what, sessions in TOOLS:
+        c0, c1 = STAGES.index(a) + 1, STAGES.index(b) + 1
+        r = next((i for i, used in enumerate(rows) if not used & set(range(c0, c1 + 1))), None)
+        if r is None:
+            rows.append(set())
+            r = len(rows) - 1
+        rows[r] |= set(range(c0, c1 + 1))
+        covers = set(STAGES[c0 - 1:c1])
+        cls = "on" if key in tools else ("dim" if focus and not covers & marked else "")
+        cells.append(f'<div class="pm-t {cls}" style="grid-column:{c0}/{c1 + 1};grid-row:{r + 2}">'
+                     f'<i>{esc(sessions)}</i><b>{esc(name)}</b><small>{esc(what)}</small></div>')
+    n = max(len(rows), len(SOURCES))
+    src_dim = " dim" if focus and not marked & {"sources", "ingest"} else ""
+    for i, (name, what) in enumerate(SOURCES):
+        cells.append(f'<div class="pm-s{src_dim}" style="grid-column:1;grid-row:{i + 2}">'
+                     f'<b>{esc(name)}</b><small>{esc(what)}</small></div>')
+    for i, (key, name, what, sessions) in enumerate(BANDS):
+        cls = "on" if key in tools else ("dim" if focus else "")
+        cells.append(f'<div class="pm-b {cls}" style="grid-column:2/-1;grid-row:{n + 2 + i}">'
+                     f'<i>{esc(sessions)}</i><b>{esc(name)}</b> <small>{esc(what)}</small></div>')
+    heads = "".join(f'<div class="pm-h{" on" if s in marked else ""}" style="grid-column:{i + 1};grid-row:1">'
+                    f'{s}</div>' for i, s in enumerate(STAGES))
+    cols = "".join(f'<div class="pm-col" style="grid-column:{i + 1};grid-row:1/{n + 2}"></div>'
+                   for i, s in enumerate(STAGES) if s in marked)
+
+    names = {t[0]: t[1] for t in TOOLS} | {b[0]: b[1] for b in BANDS}
+    if title is None and focus:
+        what = " + ".join(names[t] for t in tools) or "this session"
+        where = " → ".join(s for s in STAGES if s in marked) or ("across the platform" if tools else "")
+        title = f"<b>You are here:</b> {esc(what)} · {where}"
+    uid = "pm-" + uuid.uuid4().hex[:10]
+    style = _MAP_CSS
+    for k, v in {"ID": uid, "INK": INK, "MUTED": MUTED, "GRID": GRID, "FADE": FADE, "NAVY": NAVY,
+                 "TINT": _tint(NAVY, 0.07)}.items():
+        style = style.replace(f"%%{k}%%", v)
+    return HTML(f'<div id="{uid}"><style>{style}</style>'
+                + (f'<div class="pm-here">{title}</div>' if title else "")
+                + f'<div class="pm-g">{cols}{heads}{"".join(cells)}</div></div>')
+
+
+# ---------------------------------------------------------------------------
 # Tables as pictures (Lab 0)
 # ---------------------------------------------------------------------------
 

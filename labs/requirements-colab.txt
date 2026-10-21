@@ -3,7 +3,7 @@
 duckdb>=1.4
 polars>=1.30
 pyarrow>=18
-dlt[duckdb]>=1.10
+dlt[duckdb]>=1.30
 dbt-core>=1.10
 dbt-duckdb>=1.11
 pyiceberg[sql-sqlite,pyarrow,pyiceberg-core]>=0.12

@@ -9,6 +9,7 @@ Instructor demos (labs/_src/demos/*.py) have no exercises: each becomes one note
 Cell markers:
     # %% [markdown]   -> markdown cell; leading "# " is stripped from each line
     # %%              -> code cell
+    # %% [markdown] 🎓 -> instructor note: solution notebooks only
 
 Exercise regions (code cells only):
     # BEGIN SOLUTION
@@ -50,10 +51,10 @@ def strip_solutions(lines: list[str], student: bool) -> list[str]:
 
 
 def convert(src: Path, student: bool, out_dir: Path | None = None) -> Path:
-    cells, kind, buf = [], None, []
+    cells, kind, buf, instructor = [], None, [], False
 
     def flush():
-        if kind is None:
+        if kind is None or (instructor and student):
             return
         lines = buf[:]
         while lines and not lines[-1].strip():
@@ -77,6 +78,7 @@ def convert(src: Path, student: bool, out_dir: Path | None = None) -> Path:
         if line.startswith("# %%"):
             flush()
             kind, buf = ("markdown" if "[markdown]" in line else "code"), []
+            instructor = "🎓" in line
         else:
             buf.append(line)
     flush()

@@ -1018,7 +1018,7 @@ print("Your complete project is in:", PROJ)
 # 4. A bug in `stg_orders` hit every historical order. Which command fixes and tests everything downstream?
 # 5. A `unique` test failed in `dbt build`. What was skipped, and was the bad data already published?
 #
-# Next: [Lab 2.3 · The Qafila dbt project](D2_3_dbt_project.ipynb). Docs:
+# Next: [Lab 2.3 · The Qafila dbt project](../D2_3_dbt_project.ipynb). Docs:
 # [materializations](https://docs.getdbt.com/docs/build/materializations) ·
 # [incremental](https://docs.getdbt.com/docs/build/incremental-models) ·
 # [macros](https://docs.getdbt.com/docs/build/jinja-macros) ·

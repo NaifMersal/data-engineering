@@ -2595,7 +2595,7 @@ requires-dist = [
     { name = "dagster-dbt", specifier = ">=0.26" },
     { name = "dbt-core", specifier = ">=1.10" },
     { name = "dbt-duckdb", specifier = ">=1.11" },
-    { name = "dlt", extras = ["duckdb"], specifier = ">=1.10" },
+    { name = "dlt", extras = ["duckdb"], specifier = ">=1.30" },
     { name = "duckdb", specifier = ">=1.4" },
     { name = "ipywidgets", specifier = ">=8.1" },
     { name = "jupyterlab", specifier = ">=4.2" },
