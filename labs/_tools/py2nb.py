@@ -3,6 +3,8 @@
     uv run python _tools/py2nb.py                 # all sources
     uv run python _tools/py2nb.py D1_1_tokenization  # one source
 
+Instructor demos (labs/_src/demos/*.py) have no exercises: each becomes one notebook in labs/demos/.
+
 Cell markers:
     # %% [markdown]   -> markdown cell; leading "# " is stripped from each line
     # %%              -> code cell
@@ -23,6 +25,7 @@ from pathlib import Path
 
 LABS = Path(__file__).resolve().parents[1]
 SRC = LABS / "_src"
+DEMO_SRC = SRC / "demos"
 
 
 def strip_solutions(lines: list[str], student: bool) -> list[str]:
@@ -44,7 +47,7 @@ def strip_solutions(lines: list[str], student: bool) -> list[str]:
     return out
 
 
-def convert(src: Path, student: bool) -> Path:
+def convert(src: Path, student: bool, out_dir: Path | None = None) -> Path:
     cells, kind, buf = [], None, []
 
     def flush():
@@ -89,7 +92,7 @@ def convert(src: Path, student: bool) -> Path:
     }
     for i, c in enumerate(nb["cells"]):
         c["id"] = f"{src.stem[:20].lower().replace('_', '-')}-{i:03d}"
-    out_dir = LABS if student else LABS / "solutions"
+    out_dir = out_dir or (LABS if student else LABS / "solutions")
     out_dir.mkdir(exist_ok=True)
     out = out_dir / f"{src.stem}.ipynb"
     out.write_text(json.dumps(nb, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -98,7 +101,10 @@ def convert(src: Path, student: bool) -> Path:
 
 if __name__ == "__main__":
     names = sys.argv[1:]
-    sources = [SRC / f"{n}.py" for n in names] if names else sorted(SRC.glob("*.py"))
+    sources = [SRC / f"{n}.py" for n in names if (SRC / f"{n}.py").exists()] if names else sorted(SRC.glob("*.py"))
+    demos = [DEMO_SRC / f"{n}.py" for n in names if (DEMO_SRC / f"{n}.py").exists()] if names else sorted(DEMO_SRC.glob("*.py"))
     for s in sources:
         for student in (True, False):
             print("wrote", convert(s, student).relative_to(LABS))
+    for s in demos:
+        print("wrote", convert(s, False, LABS / "demos").relative_to(LABS))
