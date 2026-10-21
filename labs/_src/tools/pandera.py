@@ -1,9 +1,10 @@
 # %% [markdown]
 # # Pandera, checks at the door
 #
-# Day 2, before Lab 2.4 · CPU only. A payment provider sends Qafila a day of payments. You check it with a few lines of
-# hand-written asserts, watch what they miss, then write the same rules once as a **Pandera schema**: every problem
-# reported at once, row by row, and the bad rows set aside while the good ones go on.
+# Day 2, before Lab 2.4, after `tools/dbt` §9 (dbt tests) · CPU only. A payment provider sends Qafila a day of
+# payments. You check it with a few lines of hand-written asserts, watch what they miss, then write the same rules once
+# as a **Pandera schema**: every problem reported at once, row by row, and the bad rows set aside while the good ones
+# go on.
 #
 # **The data:** eight invented payments, few enough to check by eye (SAR), with six problems hidden in them. At the end
 # the same schema meets the real payments feed. Lab 2.4 then validates the supplier price files.
@@ -13,23 +14,26 @@
 # **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
 # then run the cell and the check after it (✅ = right). Answers: `solutions/tools/pandera.ipynb`.
 #
-# **Contents**
-# - [ ] 1 · The problem: checks written by hand
-# - [ ] 2 · The mental model: a schema, a validation, a report
-# - [ ] 3 · Hello world
-# - [ ] 4 · Types and nulls, before any rule
-# - [ ] 5 · Built-in checks, and every failure at once
-# - [ ] 6 · Your own checks: one column, or the whole row
-# - [ ] 7 · Quarantine: good rows on, bad rows aside
-# - [ ] 8 · Pandera and dbt tests: where each rule belongs
-# - [ ] 9 · The real feed
-# - [ ] 10 · Back to the map
+# **Contents** · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 16'
+# - [ ] 1 · The problem: checks written by hand · 🎯 2'
+# - [ ] 2 · The mental model: a schema, a validation, a report · 🎯 1'
+# - [ ] 3 · Hello world · 🎯 1'
+# - [ ] 4 · Types and nulls, before any rule · 🎯 2'
+# - [ ] 5 · Built-in checks, and every failure at once · 🎯 3', Ex. 1 filled in together
+# - [ ] 6 · Your own checks: one column, or the whole row · 🎯 2', Ex. 2 filled in together
+# - [ ] 7 · Quarantine: good rows on, bad rows aside · 🎯 2', Ex. 3 filled in together
+# - [ ] 8 · Pandera and dbt tests: where each rule belongs · 🎯 2'
+# - [ ] 9 · The real feed · ➕
+# - [ ] 10 · Back to the map · 🎯 1'
 
 # %% [markdown] 🎓
 # 🎓 **Instructor notes** (solution notebook only)
 #
-# - Sections 1–7 carry the session; 8 is the discussion that links it to Lab 2.3's dbt tests and to Day 4's
-#   contracts. 9 is a two-minute look at real data before the lab.
+# - D2_4 opens with `tools/dbt` §9 (10'), then this walkthrough: core ≈ 16' (🎯 in the contents); §9 is ➕. §8 links
+#   the two halves of the session: the same rules, at the door (Pandera) and in the warehouse (dbt).
+# - Fill in the three exercises together (the room calls out the blanks): each builds what the next section uses
+#   (`Payment`, `failures2`, `clean`).
+# - In class, run the cells of a ➕ section without stopping on them: later cells may use what they build.
 # - Lab 2.4 task 5 asks for the `SupplierPrice` model and gives the quarantine code: here the same mechanism runs on
 #   payments, so don't write the supplier schema in class.
 # - Expect "why not Great Expectations / Soda?": same job (declared expectations, a report). Pandera is a library that
@@ -249,9 +253,10 @@ except pa.errors.SchemaError as e:
 #
 # `validate(df, lazy=True)` runs **every** check and raises `SchemaErrors` (plural) with a table of failures.
 #
-# ✏️ **Exercise 1** · Write the schema `Payment`: `payment_id` (int) unique; `order_id` (int); `amount` (float) greater
-# than 0; `method` (str) one of `card`, `wallet`, `cash`; `status` (str) one of `captured`, `refunded`, `failed`. Then
-# validate `PAYMENTS` with `lazy=True` and store the failure table (`e.failure_cases`) in `failures`.
+# ✏️ **Exercise 1** (🎯 together in class) · Write the schema `Payment`: `payment_id` (int) unique; `order_id` (int);
+# `amount` (float) greater than 0; `method` (str) one of `card`, `wallet`, `cash`; `status` (str) one of `captured`,
+# `refunded`, `failed`. Then validate `PAYMENTS` with `lazy=True` and store the failure table (`e.failure_cases`) in
+# `failures`.
 # - **Check yourself:** six failures: two for the duplicate 9003, one each for the negative, the null, `cheque` and
 #   `Card`.
 
@@ -343,9 +348,9 @@ except pa.errors.SchemaErrors as e:
 # 🔍 Subclassing `Payment` kept its rules (the six failures of §5) and added one: 275.855 isn't a sum in halalas. A **dataframe check** sees whole rows, so it can compare
 # columns: that's the refund before its capture.
 #
-# ✏️ **Exercise 2** · Write `PaymentWithRefunds`, a subclass of `Payment` with `refunded_at` nullable, and a
-# `@pa.dataframe_check` named `refund_after_capture`: a row passes if `refunded_at` is null **or** later than
-# `captured_at`. Validate `PAYMENTS` lazily and store the failures in `failures2`.
+# ✏️ **Exercise 2** (🎯 together in class) · Write `PaymentWithRefunds`, a subclass of `Payment` with `refunded_at`
+# nullable, and a `@pa.dataframe_check` named `refund_after_capture`: a row passes if `refunded_at` is null **or** later
+# than `captured_at`. Validate `PAYMENTS` lazily and store the failures in `failures2`.
 # - **Check yourself:** seven failures now; the new one is row 1 (payment 9002).
 
 # %%
@@ -403,9 +408,9 @@ print(PaymentWithRefunds.to_schema())
 #
 # The failure table has the row numbers. Number the rows the same way, then split.
 #
-# ✏️ **Exercise 3** · Build `reasons` (one row per bad `index`, its checks joined with `"; "` into `reason`), then
-# `quarantine` (the bad rows with their `reason`, an inner join) and `clean` (the other rows, an anti join, without
-# `index`).
+# ✏️ **Exercise 3** (🎯 together in class) · Build `reasons` (one row per bad `index`, its checks joined with `"; "` into
+# `reason`), then `quarantine` (the bad rows with their `reason`, an inner join) and `clean` (the other rows, an anti
+# join, without `index`).
 # - **Check yourself:** one clean row (9001), seven quarantined.
 
 # %%
@@ -486,7 +491,7 @@ except pa.errors.SchemaError as e:
 # assets.
 
 # %% [markdown]
-# ## 9 · The real feed
+# ## 9 · The real feed ➕
 #
 # The real payment provider's feed has more methods (`apple_pay`), ids like `pay_9000464`, and a field added halfway
 # through (`wallet_provider`, the change dlt evolved in `tools/dlt`). A schema for it, built from `Payment`:

@@ -14,19 +14,19 @@
 # **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
 # then run the cell and the check after it (✅ = right). Answers: `solutions/tools/polars.ipynb`.
 #
-# **Contents**
-# - [ ] 1 · The problem: a question answered by a loop
-# - [ ] 2 · The mental model: you write the rules, the engine runs them
-# - [ ] 3 · Hello world: a DataFrame is a table of typed columns
-# - [ ] 4 · Expressions and `select`
-# - [ ] 5 · `filter`: keep the rows you want
-# - [ ] 6 · `with_columns`: add and fix columns
-# - [ ] 7 · `group_by` + `agg`: one row per group
-# - [ ] 8 · Joins: combine tables
-# - [ ] 9 · `over`: group answers without collapsing rows
-# - [ ] 10 · Lazy mode: describe the query, let Polars plan it
-# - [ ] 11 · Put it together: one question, one chain
-# - [ ] 12 · Back to the map
+# **Contents** · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 27'
+# - [ ] 1 · The problem: a question answered by a loop · 🎯 3'
+# - [ ] 2 · The mental model: you write the rules, the engine runs them · 🎯 3'
+# - [ ] 3 · Hello world: a DataFrame is a table of typed columns · 🎯 2'
+# - [ ] 4 · Expressions and `select` · 🎯 4', Ex. 2 filled in together
+# - [ ] 5 · `filter`: keep the rows you want · 🎯 2'
+# - [ ] 6 · `with_columns`: add and fix columns · 🎯 2'
+# - [ ] 7 · `group_by` + `agg`: one row per group · 🎯 3'
+# - [ ] 8 · Joins: combine tables · 🎯 2' one join · ➕ orphans
+# - [ ] 9 · `over`: group answers without collapsing rows · ➕
+# - [ ] 10 · Lazy mode: describe the query, let Polars plan it · 🎯 5'
+# - [ ] 11 · Put it together: one question, one chain · ➕
+# - [ ] 12 · Back to the map · 🎯 1'
 #
 # Know pandas? Polars looks similar but thinks differently: there is no index, nothing is changed in place (every
 # method returns a new DataFrame), and you describe columns with **expressions** instead of indexing with `df[...]`.
@@ -35,8 +35,10 @@
 # %% [markdown] 🎓
 # 🎓 **Instructor notes** (solution notebook only)
 #
-# - Walked in class so far in 30–50'. §1–2 set the frame (5'); §4 (expressions and contexts) is the one to slow down
-#   on; §9 and the exercises can be left for the students' own pace if time is short.
+# - Core ≈ 27' (🎯 in the contents; walked in class so far in 30–50' with exercises). §1–2 set the frame (6'); §4
+#   (expressions and contexts) is the one to slow down on. §9, §11 and the exercises are ➕, except Ex. 2: fill it in
+#   together (the room calls out the blanks), because §5, §8 and §11 use `lines`.
+# - In class, run the cells of a ➕ section without stopping on them: later cells may use what they build.
 # - §1 reads the courier feed 40 times (≈900k events): the loop takes several seconds, Polars well under one. The
 #   ratio is the point, not the numbers; quick mode reads it 10 times.
 # - Lab 2.1 parses three timestamp formats, picks one copy per `event_id` and cleans customers: don't teach those here.
@@ -301,7 +303,8 @@ orders.select("order_id", "delivery_fee", pl.col("delivery_fee").mean().alias("a
 # 🔍 One row when everything aggregates. When one expression returns 45,766 values and another returns one, Polars
 # repeats (**broadcasts**) the single value on every row, like SQL's `avg(delivery_fee) OVER ()`.
 #
-# ✏️ **Exercise 2** · Compute the amount of every order line: `quantity * unit_price - discount`, rounded to 2 decimals.
+# ✏️ **Exercise 2** (🎯 together in class) · Compute the amount of every order line: `quantity * unit_price - discount`,
+# rounded to 2 decimals.
 # - **Result:** `lines`, one row per line of `items`, columns `order_id`, `line_no`, `line_total`.
 # - **Check yourself:** order 5000001's first line is 2 × 49.20 SAR = 98.4.
 
@@ -588,7 +591,7 @@ store_revenue = (
 store_revenue
 
 # %% [markdown]
-# ## 9 · `over`: group answers without collapsing rows
+# ## 9 · `over`: group answers without collapsing rows ➕
 #
 # `group_by` gives one row per group. Sometimes you want the group's answer **next to each row** instead: "what share of
 # its city's revenue does this store make?" That's `.over(...)`, Polars' window function: `pl.col("revenue").sum()
@@ -734,7 +737,7 @@ U.check(delivered_by_city.equals(expected_counts), "same answer as the eager ver
 # Those counts are a little too high, by the way: the courier feed contains **redelivered** copies of some events. Lab
 # 2.1 removes them, with the same lazy chain plus one `unique` step.
 #
-# ## 11 · Put it together: one question, one chain
+# ## 11 · Put it together: one question, one chain ➕
 #
 # *What is the average delivered basket per city, in September?* Everything you need is above: a filter, a join, a
 # derived column, an aggregation. This time the template only gives you the steps.

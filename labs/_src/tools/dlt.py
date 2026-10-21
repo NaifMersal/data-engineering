@@ -12,22 +12,24 @@
 # **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
 # then run the cell and the check after it (✅ = right). Answers: `solutions/tools/dlt.ipynb`.
 #
-# **Contents**
-# - [ ] 1 · The problem: a loader written by hand
-# - [ ] 2 · The mental model: a resource, three steps, a load package
-# - [ ] 3 · Hello world, and the three steps one at a time
-# - [ ] 4 · Write dispositions: append, replace, merge
-# - [ ] 5 · Incremental loading: a cursor kept in state
-# - [ ] 6 · Break it on purpose: a late record slips past the cursor
-# - [ ] 7 · Schemas: inferred, evolved, nested, and frozen by a contract
-# - [ ] 8 · From Python lists to a real API
-# - [ ] 9 · Back to the map
+# **Contents** · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 25'
+# - [ ] 1 · The problem: a loader written by hand · 🎯 4'
+# - [ ] 2 · The mental model: a resource, three steps, a load package · 🎯 2'
+# - [ ] 3 · Hello world, and the three steps one at a time · 🎯 5'
+# - [ ] 4 · Write dispositions: append, replace, merge · 🎯 4'
+# - [ ] 5 · Incremental loading: a cursor kept in state · 🎯 5'
+# - [ ] 6 · Break it on purpose: a late record slips past the cursor · ➕
+# - [ ] 7 · Schemas: inferred, evolved, nested, and frozen by a contract · 🎯 3' evolution · ➕ nested, variant, contracts
+# - [ ] 8 · From Python lists to a real API · ➕ (Lab 1.3 does it on the payments API)
+# - [ ] 9 · Back to the map · 🎯 2'
 
 # %% [markdown] 🎓
 # 🎓 **Instructor notes** (solution notebook only)
 #
 # - Run the setup cell before class (Colab installs dlt in about a minute).
-# - Sections 1–5 carry the session: the pain, the three steps, dispositions, and the cursor stored with the data.
+# - Core ≈ 25' (🎯 in the contents; estimated, not taught yet): sections 1–5, schema evolution in 7, and 9. §6 and
+#   §8 are ➕. Sections 1–5 carry the session: the pain, the three steps, dispositions, the cursor in state.
+# - In class, run the cells of a ➕ section without stopping on them: later cells may use what they build.
 #   Lab 1.3 repeats each of them on the real API, so don't solve the lab's exercises here.
 # - Ask every 🤔 question out loud and wait for two or three answers before running the cell.
 # - Expect "why not Airbyte / Fivetran?": same jobs (pagination, state, schema, load log), as a hosted service with
@@ -428,7 +430,7 @@ sql("SELECT version, pipeline_name, created_at, _dlt_load_id FROM raw._dlt_pipel
 # 🎓 This is the answer to the cursor-in-a-file problem in §1. Lab 1.3's first checkpoint question asks it again.
 
 # %% [markdown]
-# ## 6 · Break it on purpose: a late record slips past the cursor
+# ## 6 · Break it on purpose: a late record slips past the cursor ➕
 #
 # A cursor trusts that records arrive in `updated_at` order. Payment **9006** was made Wednesday at 08:50, but the
 # provider only exported it on Thursday.
@@ -570,7 +572,7 @@ U.check(not any(c.endswith("__v_text") for c in strict_cols), "no variant column
 # stops the pipeline and needs someone to answer the alert. Lab 4.2 writes the agreement down as a data contract.
 
 # %% [markdown]
-# ## 8 · From Python lists to a real API
+# ## 8 · From Python lists to a real API ➕
 #
 # So far the provider was a Python function. The real one is an HTTP API: pages of 500 records, a cursor parameter
 # `updated_since`, and a **429 Too Many Requests** when you call too fast. `U.PaymentsAPI` is a local copy of it,

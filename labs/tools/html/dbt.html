@@ -7803,25 +7803,26 @@ a.anchor-link {
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h1 id="dbt,-from-an-empty-folder-to-a-tested-report">dbt, from an empty folder to a tested report<a class="anchor-link" href="#dbt,-from-an-empty-folder-to-a-tested-report">¶</a></h1><p>Day 2, before Lab 2.3 · CPU only. You build a small dbt project file by file and read every piece of SQL dbt
-generates from it, so nothing in Lab 2.3's big project is magic. §9 also teaches the dbt tests Lab 2.4 uses.</p>
+generates from it, so nothing in Lab 2.3's big project is magic. §9, the dbt tests Lab 2.4 uses, opens
+session D2_4.</p>
 <p><strong>The question:</strong> how much delivered product revenue came from each store city? The rows are invented and small
 enough to check by hand (SAR, without delivery fees).</p>
 <p><strong>Rhythm:</strong> 🤔 predict → run → 🔍 read. The ▶ players replay what dbt just did, one step at a time.</p>
 <p><strong>Exercises (✏️):</strong> uncomment the template (<code>Ctrl+/</code>), replace every <code>___</code>, delete the two <code>YOUR CODE HERE</code> lines,
 then run the cell and the check after it (✅ = right). Answers: <code>solutions/tools/dbt.ipynb</code>.</p>
-<p><strong>Contents</strong></p>
+<p><strong>Contents</strong> · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 27'</p>
 <ul>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · Raw data: what dbt does not load</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The problem: three SQL files, run by hand</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · The mental model: a graph of <code>SELECT</code>s</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · A project, a profile and its sources</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Hello world: a <code>SELECT</code> becomes a view</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · <code>ref()</code> builds a graph, and the graph sets the order</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Materializations: view, table, incremental; break one on purpose</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Macros: write an expression once</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · Tests: a build that succeeds is not a correct build</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>10 · Lineage, documentation, and one more model of your own</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>11 · Back to the map</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · Raw data: what dbt does not load · run before class</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The problem: three SQL files, run by hand · 🎯 4'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · The mental model: a graph of <code>SELECT</code>s · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · A project, a profile and its sources · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Hello world: a <code>SELECT</code> becomes a view · 🎯 3'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · <code>ref()</code> builds a graph, and the graph sets the order · 🎯 5', Ex. 1–2 filled in together</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Materializations: view, table, incremental; break one on purpose · 🎯 7' 7a–b · ➕ 7c–d</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Macros: write an expression once · 🎯 2' (Lab 2.3 calls a macro)</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · Tests: a build that succeeds is not a correct build · <strong>opens D2_4</strong>: 🎯 10' §9, 9a–c · ➕ 9d</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>10 · Lineage, documentation, and one more model of your own · 🎯 1'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>11 · Back to the map · 🎯 1'</li>
 </ul>
 </div>
 </div>
@@ -9670,7 +9671,8 @@ temporary name (<code>__dbt_tmp</code>) and renames at the end, so nobody reads 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>✏️ <strong>Exercise 1</strong> · Write <code>models/staging/stg_stores.sql</code>: <code>store_id</code> and <code>city</code>, read with <code>source()</code>.</p>
+<p>✏️ <strong>Exercise 1</strong> (🎯 together in class) · Write <code>models/staging/stg_stores.sql</code>: <code>store_id</code> and <code>city</code>, read with
+<code>source()</code>.</p>
 <ul>
 <li><strong>Check yourself:</strong> 2 rows, and the compiled SQL contains <code>"raw"."stores"</code>.</li>
 </ul>
@@ -9905,8 +9907,8 @@ keeps every status; the report decides what counts.</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>✏️ <strong>Exercise 2</strong> · Write <code>models/marts/mart_city_sales.sql</code>: join the fact to the stores (both with <code>ref()</code>), keep
-delivered lines, and sum <code>net_amount</code> per city as <code>revenue_sar</code>.</p>
+<p>✏️ <strong>Exercise 2</strong> (🎯 together in class) · Write <code>models/marts/mart_city_sales.sql</code>: join the fact to the stores (both
+with <code>ref()</code>), keep delivered lines, and sum <code>net_amount</code> per city as <code>revenue_sar</code>.</p>
 <ul>
 <li><strong>Check yourself:</strong> Riyadh 275.86, Jeddah 33.65.</li>
 </ul>
@@ -11674,7 +11676,7 @@ outside the window and never read. All the SQL of that run:</p>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p><code>unique_key</code> matches rows; it doesn't <strong>check</strong> that they're unique. Only a test does (§9).</p>
-<h3 id="7c-%C2%B7-Other-strategies,-and-one-side-by-side">7c · Other strategies, and one side by side<a class="anchor-link" href="#7c-%C2%B7-Other-strategies,-and-one-side-by-side">¶</a></h3><p><code>incremental_strategy</code> decides how the batch the filter selected is written into the table:</p>
+<h3 id="7c-%C2%B7-Other-strategies,-and-one-side-by-side-%E2%9E%95">7c · Other strategies, and one side by side ➕<a class="anchor-link" href="#7c-%C2%B7-Other-strategies,-and-one-side-by-side-%E2%9E%95">¶</a></h3><p><code>incremental_strategy</code> decides how the batch the filter selected is written into the table:</p>
 <table>
 <thead>
 <tr>
@@ -11865,7 +11867,7 @@ Wrote models/marts/fct_order_items_incremental.sql
 (<code>merge_update_columns=['status', 'updated_at']</code> in the <code>config()</code>); <code>delete+insert</code> always replaces the whole row.</p>
 <p>Every strategy writes only what the filter selected. So what happens when a row changes and the filter doesn't
 select it?</p>
-<h3 id="7d-%C2%B7-%F0%9F%A7%AA-Break-it-on-purpose:-a-change-the-filter-can't-see">7d · 🧪 Break it on purpose: a change the filter can't see<a class="anchor-link" href="#7d-%C2%B7-%F0%9F%A7%AA-Break-it-on-purpose:-a-change-the-filter-can't-see">¶</a></h3><p>🤔 <strong>Predict</strong> · Line 102-1 gets a 2 SAR discount. The line changes; its order's <code>updated_at</code> doesn't. After
+<h3 id="7d-%C2%B7-%F0%9F%A7%AA-Break-it-on-purpose:-a-change-the-filter-can't-see-%E2%9E%95">7d · 🧪 Break it on purpose: a change the filter can't see ➕<a class="anchor-link" href="#7d-%C2%B7-%F0%9F%A7%AA-Break-it-on-purpose:-a-change-the-filter-can't-see-%E2%9E%95">¶</a></h3><p>🤔 <strong>Predict</strong> · Line 102-1 gets a 2 SAR discount. The line changes; its order's <code>updated_at</code> doesn't. After
 rebuilding both facts, which one has the discount?</p>
 </div>
 </div>
@@ -15820,7 +15822,7 @@ Wrote macros/net_amount.sql
 <p>🔍 The data tests pass: no key is duplicated, no value is null, no revenue is negative. The numbers are simply wrong
 by every discount. Only a test that knows the expected answer catches a wrong rule. A plain <code>dbt build</code> runs each
 unit test <strong>before</strong> its model, so with the unit test in place this rule would never have reached the table.</p>
-<h3 id="9d-%C2%B7-Where-each-check-belongs">9d · Where each check belongs<a class="anchor-link" href="#9d-%C2%B7-Where-each-check-belongs">¶</a></h3><table>
+<h3 id="9d-%C2%B7-Where-each-check-belongs-%E2%9E%95">9d · Where each check belongs ➕<a class="anchor-link" href="#9d-%C2%B7-Where-each-check-belongs-%E2%9E%95">¶</a></h3><table>
 <thead>
 <tr>
 <th>Where</th>

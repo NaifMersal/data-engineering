@@ -7802,26 +7802,27 @@ a.anchor-link {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="Pandera,-checks-at-the-door">Pandera, checks at the door<a class="anchor-link" href="#Pandera,-checks-at-the-door">¶</a></h1><p>Day 2, before Lab 2.4 · CPU only. A payment provider sends Qafila a day of payments. You check it with a few lines of
-hand-written asserts, watch what they miss, then write the same rules once as a <strong>Pandera schema</strong>: every problem
-reported at once, row by row, and the bad rows set aside while the good ones go on.</p>
+<h1 id="Pandera,-checks-at-the-door">Pandera, checks at the door<a class="anchor-link" href="#Pandera,-checks-at-the-door">¶</a></h1><p>Day 2, before Lab 2.4, after <code>tools/dbt</code> §9 (dbt tests) · CPU only. A payment provider sends Qafila a day of
+payments. You check it with a few lines of hand-written asserts, watch what they miss, then write the same rules once
+as a <strong>Pandera schema</strong>: every problem reported at once, row by row, and the bad rows set aside while the good ones
+go on.</p>
 <p><strong>The data:</strong> eight invented payments, few enough to check by eye (SAR), with six problems hidden in them. At the end
 the same schema meets the real payments feed. Lab 2.4 then validates the supplier price files.</p>
 <p><strong>Rhythm:</strong> 🤔 predict → run → 🔍 read.</p>
 <p><strong>Exercises (✏️):</strong> uncomment the template (<code>Ctrl+/</code>), replace every <code>___</code>, delete the two <code>YOUR CODE HERE</code> lines,
 then run the cell and the check after it (✅ = right). Answers: <code>solutions/tools/pandera.ipynb</code>.</p>
-<p><strong>Contents</strong></p>
+<p><strong>Contents</strong> · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 16'</p>
 <ul>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · The problem: checks written by hand</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The mental model: a schema, a validation, a report</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · Hello world</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · Types and nulls, before any rule</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Built-in checks, and every failure at once</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · Your own checks: one column, or the whole row</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Quarantine: good rows on, bad rows aside</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Pandera and dbt tests: where each rule belongs</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · The real feed</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>10 · Back to the map</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · The problem: checks written by hand · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The mental model: a schema, a validation, a report · 🎯 1'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · Hello world · 🎯 1'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · Types and nulls, before any rule · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Built-in checks, and every failure at once · 🎯 3', Ex. 1 filled in together</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · Your own checks: one column, or the whole row · 🎯 2', Ex. 2 filled in together</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Quarantine: good rows on, bad rows aside · 🎯 2', Ex. 3 filled in together</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Pandera and dbt tests: where each rule belongs · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · The real feed · ➕</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>10 · Back to the map · 🎯 1'</li>
 </ul>
 </div>
 </div>
@@ -8503,9 +8504,10 @@ be null unless you say <code>nullable=True</code></strong>. dbt is the other way
 </tbody>
 </table>
 <p><code>validate(df, lazy=True)</code> runs <strong>every</strong> check and raises <code>SchemaErrors</code> (plural) with a table of failures.</p>
-<p>✏️ <strong>Exercise 1</strong> · Write the schema <code>Payment</code>: <code>payment_id</code> (int) unique; <code>order_id</code> (int); <code>amount</code> (float) greater
-than 0; <code>method</code> (str) one of <code>card</code>, <code>wallet</code>, <code>cash</code>; <code>status</code> (str) one of <code>captured</code>, <code>refunded</code>, <code>failed</code>. Then
-validate <code>PAYMENTS</code> with <code>lazy=True</code> and store the failure table (<code>e.failure_cases</code>) in <code>failures</code>.</p>
+<p>✏️ <strong>Exercise 1</strong> (🎯 together in class) · Write the schema <code>Payment</code>: <code>payment_id</code> (int) unique; <code>order_id</code> (int);
+<code>amount</code> (float) greater than 0; <code>method</code> (str) one of <code>card</code>, <code>wallet</code>, <code>cash</code>; <code>status</code> (str) one of <code>captured</code>,
+<code>refunded</code>, <code>failed</code>. Then validate <code>PAYMENTS</code> with <code>lazy=True</code> and store the failure table (<code>e.failure_cases</code>) in
+<code>failures</code>.</p>
 <ul>
 <li><strong>Check yourself:</strong> six failures: two for the duplicate 9003, one each for the negative, the null, <code>cheque</code> and
 <code>Card</code>.</li>
@@ -8754,9 +8756,9 @@ Polars it gets a <code>PolarsData</code> (<code>data.lazyframe</code> and the co
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p>🔍 Subclassing <code>Payment</code> kept its rules (the six failures of §5) and added one: 275.855 isn't a sum in halalas. A <strong>dataframe check</strong> sees whole rows, so it can compare
 columns: that's the refund before its capture.</p>
-<p>✏️ <strong>Exercise 2</strong> · Write <code>PaymentWithRefunds</code>, a subclass of <code>Payment</code> with <code>refunded_at</code> nullable, and a
-<code>@pa.dataframe_check</code> named <code>refund_after_capture</code>: a row passes if <code>refunded_at</code> is null <strong>or</strong> later than
-<code>captured_at</code>. Validate <code>PAYMENTS</code> lazily and store the failures in <code>failures2</code>.</p>
+<p>✏️ <strong>Exercise 2</strong> (🎯 together in class) · Write <code>PaymentWithRefunds</code>, a subclass of <code>Payment</code> with <code>refunded_at</code>
+nullable, and a <code>@pa.dataframe_check</code> named <code>refund_after_capture</code>: a row passes if <code>refunded_at</code> is null <strong>or</strong> later
+than <code>captured_at</code>. Validate <code>PAYMENTS</code> lazily and store the failures in <code>failures2</code>.</p>
 <ul>
 <li><strong>Check yourself:</strong> seven failures now; the new one is row 1 (payment 9002).</li>
 </ul>
@@ -8929,9 +8931,9 @@ rule the data must meet.</p>
 way: <strong>quarantine</strong>. Valid rows go on, invalid rows go to a separate place with the reason, and someone (the
 provider, the data owner) is told.</p>
 <p>The failure table has the row numbers. Number the rows the same way, then split.</p>
-<p>✏️ <strong>Exercise 3</strong> · Build <code>reasons</code> (one row per bad <code>index</code>, its checks joined with <code>"; "</code> into <code>reason</code>), then
-<code>quarantine</code> (the bad rows with their <code>reason</code>, an inner join) and <code>clean</code> (the other rows, an anti join, without
-<code>index</code>).</p>
+<p>✏️ <strong>Exercise 3</strong> (🎯 together in class) · Build <code>reasons</code> (one row per bad <code>index</code>, its checks joined with <code>"; "</code> into
+<code>reason</code>), then <code>quarantine</code> (the bad rows with their <code>reason</code>, an inner join) and <code>clean</code> (the other rows, an anti
+join, without <code>index</code>).</p>
 <ul>
 <li><strong>Check yourself:</strong> one clean row (9001), seven quarantined.</li>
 </ul>
@@ -9172,7 +9174,7 @@ assets.</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="9-%C2%B7-The-real-feed">9 · The real feed<a class="anchor-link" href="#9-%C2%B7-The-real-feed">¶</a></h2><p>The real payment provider's feed has more methods (<code>apple_pay</code>), ids like <code>pay_9000464</code>, and a field added halfway
+<h2 id="9-%C2%B7-The-real-feed-%E2%9E%95">9 · The real feed ➕<a class="anchor-link" href="#9-%C2%B7-The-real-feed-%E2%9E%95">¶</a></h2><p>The real payment provider's feed has more methods (<code>apple_pay</code>), ids like <code>pay_9000464</code>, and a field added halfway
 through (<code>wallet_provider</code>, the change dlt evolved in <code>tools/dlt</code>). A schema for it, built from <code>Payment</code>:</p>
 </div>
 </div>

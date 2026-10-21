@@ -2,7 +2,8 @@
 # # dbt, from an empty folder to a tested report
 #
 # Day 2, before Lab 2.3 · CPU only. You build a small dbt project file by file and read every piece of SQL dbt
-# generates from it, so nothing in Lab 2.3's big project is magic. §9 also teaches the dbt tests Lab 2.4 uses.
+# generates from it, so nothing in Lab 2.3's big project is magic. §9, the dbt tests Lab 2.4 uses, opens
+# session D2_4.
 #
 # **The question:** how much delivered product revenue came from each store city? The rows are invented and small
 # enough to check by hand (SAR, without delivery fees).
@@ -12,24 +13,28 @@
 # **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
 # then run the cell and the check after it (✅ = right). Answers: `solutions/tools/dbt.ipynb`.
 #
-# **Contents**
-# - [ ] 1 · Raw data: what dbt does not load
-# - [ ] 2 · The problem: three SQL files, run by hand
-# - [ ] 3 · The mental model: a graph of `SELECT`s
-# - [ ] 4 · A project, a profile and its sources
-# - [ ] 5 · Hello world: a `SELECT` becomes a view
-# - [ ] 6 · `ref()` builds a graph, and the graph sets the order
-# - [ ] 7 · Materializations: view, table, incremental; break one on purpose
-# - [ ] 8 · Macros: write an expression once
-# - [ ] 9 · Tests: a build that succeeds is not a correct build
-# - [ ] 10 · Lineage, documentation, and one more model of your own
-# - [ ] 11 · Back to the map
+# **Contents** · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 27'
+# - [ ] 1 · Raw data: what dbt does not load · run before class
+# - [ ] 2 · The problem: three SQL files, run by hand · 🎯 4'
+# - [ ] 3 · The mental model: a graph of `SELECT`s · 🎯 2'
+# - [ ] 4 · A project, a profile and its sources · 🎯 2'
+# - [ ] 5 · Hello world: a `SELECT` becomes a view · 🎯 3'
+# - [ ] 6 · `ref()` builds a graph, and the graph sets the order · 🎯 5', Ex. 1–2 filled in together
+# - [ ] 7 · Materializations: view, table, incremental; break one on purpose · 🎯 7' 7a–b · ➕ 7c–d
+# - [ ] 8 · Macros: write an expression once · 🎯 2' (Lab 2.3 calls a macro)
+# - [ ] 9 · Tests: a build that succeeds is not a correct build · **opens D2_4**: 🎯 10' §9, 9a–c · ➕ 9d
+# - [ ] 10 · Lineage, documentation, and one more model of your own · 🎯 1'
+# - [ ] 11 · Back to the map · 🎯 1'
 
 # %% [markdown] 🎓
 # 🎓 **Instructor notes** (solution notebook only)
 #
-# - Walked in class so far in about 70' (before §9's severity, contract and unit-test parts were added). §7 is the
-#   longest: 7c (strategies) can be left for the students' own pace; Lab 2.3 §3–4 applies 7b to the real fact.
+# - Walked in class so far in about 70'. Now split over two sessions: **D2_3** = §2–8, 10–11, core ≈ 27' (🎯 in the
+#   contents; 7c–d are ➕); **D2_4 opens with §9** (10': tests, 9a–c; 9d is ➕), then `tools/pandera`. Run the
+#   notebook down to §9 before D2_4 (a few minutes). Lab 2.3 §3 applies 7b to the real fact without re-teaching it.
+# - §6: fill in Exercises 1–2 together (the room calls out the blanks). Every later cell needs `stg_stores` and
+#   `mart_city_sales`, so they can't be left for later. The other exercises are ➕.
+# - In class, run the cells of a ➕ section without stopping on them: later cells may use what they build.
 # - §9's warn / contract / unit-test cells teach the mechanisms Lab 2.4 uses, on different cases: Lab 2.4 writes a
 #   `relationships` test with `severity: warn`, breaks a contract with a type change, and unit-tests mobile numbers.
 # - Every `dbt(...)` call takes a few seconds in process; a full run of this notebook is a few minutes.
@@ -515,7 +520,8 @@ FROM {{ source('qafila_raw', 'order_items') }}
 """)
 
 # %% [markdown]
-# ✏️ **Exercise 1** · Write `models/staging/stg_stores.sql`: `store_id` and `city`, read with `source()`.
+# ✏️ **Exercise 1** (🎯 together in class) · Write `models/staging/stg_stores.sql`: `store_id` and `city`, read with
+# `source()`.
 # - **Check yourself:** 2 rows, and the compiled SQL contains `"raw"."stores"`.
 
 # %%
@@ -553,8 +559,8 @@ WHERE i.quantity > 0
 write_file("models/marts/fct_order_items.sql", FACT_SELECT)
 
 # %% [markdown]
-# ✏️ **Exercise 2** · Write `models/marts/mart_city_sales.sql`: join the fact to the stores (both with `ref()`), keep
-# delivered lines, and sum `net_amount` per city as `revenue_sar`.
+# ✏️ **Exercise 2** (🎯 together in class) · Write `models/marts/mart_city_sales.sql`: join the fact to the stores (both
+# with `ref()`), keep delivered lines, and sum `net_amount` per city as `revenue_sar`.
 # - **Check yourself:** Riyadh 275.86, Jeddah 33.65.
 
 # %%
@@ -753,7 +759,7 @@ V.sql_steps([
 # %% [markdown]
 # `unique_key` matches rows; it doesn't **check** that they're unique. Only a test does (§9).
 #
-# ### 7c · Other strategies, and one side by side
+# ### 7c · Other strategies, and one side by side ➕
 #
 # `incremental_strategy` decides how the batch the filter selected is written into the table:
 #
@@ -789,7 +795,7 @@ write_file("models/marts/fct_order_items_incremental.sql", INCREMENTAL_SQL)   # 
 # Every strategy writes only what the filter selected. So what happens when a row changes and the filter doesn't
 # select it?
 #
-# ### 7d · 🧪 Break it on purpose: a change the filter can't see
+# ### 7d · 🧪 Break it on purpose: a change the filter can't see ➕
 #
 # 🤔 **Predict** · Line 102-1 gets a 2 SAR discount. The line changes; its order's `updated_at` doesn't. After
 # rebuilding both facts, which one has the discount?
@@ -1168,7 +1174,7 @@ U.check(city("Jeddah") == 43.65, "macro restored: the report is right again")
 # by every discount. Only a test that knows the expected answer catches a wrong rule. A plain `dbt build` runs each
 # unit test **before** its model, so with the unit test in place this rule would never have reached the table.
 #
-# ### 9d · Where each check belongs
+# ### 9d · Where each check belongs ➕
 #
 # | Where | Check | Catches | In this course |
 # |---|---|---|---|

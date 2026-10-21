@@ -14,7 +14,7 @@
 <body>
 <div class="deck" data-day="Day 2" data-course="Modern Data Engineering">
 
-<section class="slide section" data-session="Session 2 · Dimensional modeling"><div class="kicker">Session 2</div><h1>Dimensional modeling</h1><p class="lead mt">Decide what one row means before deciding how to calculate sales.</p><div class="sess-no">02</div><aside class="notes">Use the example order lines throughout this session. Work through grain and fan-out slowly. The SCD2 and alternative-model slides offer context. Lab 2.2 builds Type 1 dimensions, not a historical customer dimension.</aside></section>
+<section class="slide section" data-session="Session 2 · Dimensional modeling"><div class="kicker">Session 2</div><h1>Dimensional modeling</h1><p class="lead mt">Decide what one row means before deciding how to calculate sales.</p><div class="sess-no">02</div><aside class="notes">Use the example order lines throughout this session. Work through grain and fan-out slowly. Lab 2.2 builds Type 1 dimensions; history (SCD2) was D1_4's topic.</aside></section>
 
 <section class="slide top" data-label="You are here">
   <div class="kicker">Silver → gold</div>
@@ -97,31 +97,14 @@ WHERE f.order_status = 'delivered'
 GROUP BY p.category;</code></pre></div><div><h3>Expected result</h3><table class="t small"><thead><tr><th>category</th><th>revenue SAR</th></tr></thead><tbody><tr><td>Meat &amp; Poultry</td><td>67.11</td></tr><tr><td>Dates &amp; Coffee</td><td>242.40</td></tr></tbody></table><p class="small mt">Chicken: 33.46 + 33.65<br/>Dates: 2 × 121.20</p></div></div><aside class="notes">The order_id filter restricts the query to the running example so the displayed results are reproducible in the full dataset. Product key joins match one dimension row per line. Source descriptions have moved to a dimension, while the meaning of the source IDs and line amounts stays the same.</aside></section>
 
 <section class="slide">
-<div class="kicker">Three fact types</div>
-<h2>Fact types describe different kinds of rows</h2>
-<table class="t small"><thead><tr><th>Fact type</th><th>One row represents</th><th>What happens over time</th></tr></thead><tbody><tr><td>Transaction</td><td>One sale, payment, or refund event</td><td>New events add rows</td></tr><tr><td>Periodic snapshot</td><td>One product in one store on one date</td><td>Each reporting period adds observations</td></tr><tr><td>Accumulating snapshot</td><td>One order moving through fulfillment</td><td>The row gains milestone timestamps</td></tr></tbody></table>
-<aside class="notes">Do not infer additivity solely from fact-table type. Transaction amounts may be additive across disjoint events. Snapshot balances are often semi-additive. Accumulating facts can contain counts, durations, and amounts with different valid aggregations.</aside>
-</section>
-
-<section class="slide">
-<div class="kicker">Which aggregations make sense?</div>
-<h2>Inventory across days cannot be added as sales can</h2>
-<p class="small"><b>Same product_id: 1149</b> (Chicken breast) &nbsp; <b>Same store_id: RUH-04</b> (Riyadh)</p>
-<div class="cols cols-32"><div><h3>Distinct sales lines</h3><table class="t small"><thead><tr><th>order_id</th><th>line_no</th><th>product_id</th><th>order_date</th><th>net_amount</th></tr></thead><tbody><tr><td>5000026</td><td>1</td><td>1149</td><td>Aug 1</td><td>33.46</td></tr><tr><td>5001390</td><td>2</td><td>1149</td><td>Aug 3</td><td>59.58</td></tr><tr><td>5001904</td><td>4</td><td>1149</td><td>Aug 4</td><td>132.28</td></tr></tbody></table><p class="small mt">Each (order_id, line_no) identifies a different sale.<br>Total = 33.46 + 59.58 + 132.28 = <b>225.32 SAR</b></p></div><div><h3>Repeated stock observations</h3><table class="t small"><thead><tr><th>product_id</th><th>date_day</th><th>stock_on_hand</th></tr></thead><tbody><tr><td>1149</td><td>Aug 1</td><td>100</td></tr><tr><td>1149</td><td>Aug 3</td><td>80</td></tr><tr><td>1149</td><td>Aug 4</td><td>60</td></tr></tbody></table><p class="small mt">Same product and store, observed on different dates.<br>Stock on Aug 4 = <b>60 units</b>, not 240.<br><span class="muted">Illustrative stock values.</span></p></div></div>
-
-<aside class="notes">The three sales lines are actual delivered records for product_id 1149 and store_id RUH-04 in qafila_oltp.sqlite. order_date is the Riyadh business date. net_amount = quantity * unit_price - discount. Their total is 225.32 SAR. The stock numbers are hypothetical observations for those same existing IDs, not a claim that the source database contains an inventory table. A periodic snapshot grain would be (product_id, store_id, date_day). Sales line grain is (order_id, line_no). Inventory is semi-additive: compatible stock can be summed across stores on one date, but not across successive observations.</aside>
-</section>
-
-<section class="slide">
-<div class="kicker">A process that changes over time</div>
-<h2>An accumulating snapshot follows one order</h2>
-<table class="t small"><thead><tr><th>State of order 5000026</th><th>created_at_utc</th><th>assigned_at_utc</th><th>delivered_at_utc</th></tr></thead><tbody><tr><td>When placed</td><td>10:00</td><td>NULL</td><td>NULL</td></tr><tr><td>When assigned</td><td>10:00</td><td>10:05</td><td>NULL</td></tr><tr><td>When delivered</td><td>10:00</td><td>10:05</td><td>10:50</td></tr></tbody></table><p class="small mt">These are three versions of the <b>same row</b>, not three sales.<br/>Delivery duration = 10:50 − 10:00 = <b>50 minutes</b>.</p>
-<aside class="notes">The milestone progression is hypothetical for the same Qafila order. created_at_utc comes from stg_orders. assigned_at_utc and delivered_at_utc come from int_delivery_timeline. For multiple orders, a mean or percentile delivery duration may be useful. Summing durations answers a different question. Repeated fulfillment stages or reopened orders may need an event fact as well.</aside>
+<div class="kicker">Three fact types · What may be added up?</div>
+<h2>The fact type decides which totals make sense</h2>
+<table class="t small"><thead><tr><th>Fact type</th><th>One row represents</th><th>Qafila example</th><th>Add it up?</th></tr></thead><tbody><tr><td>Transaction</td><td>One sale, payment, or refund; new events add rows</td><td>Product 1149 at RUH-04: lines on Aug 1, 3, 4 of 33.46, 59.58, 132.28 SAR</td><td><b>Yes:</b> 225.32 SAR</td></tr><tr><td>Periodic snapshot</td><td>One product in one store on one date</td><td>Stock of product 1149: 100, 80, 60 units on Aug 1, 3, 4</td><td><b>Not across dates:</b> stock on Aug 4 is 60, not 240</td></tr><tr><td>Accumulating snapshot</td><td>One order moving through fulfillment; the row gains milestone times</td><td>Order 5000026: placed 10:00, assigned 10:05, delivered 10:50</td><td><b>Average the durations</b> (50 min here); a sum answers nothing</td></tr></tbody></table>
+<p class="small mt">Lab 2.2 builds a transaction fact: one row per order line. <span class="muted">Stock values and milestone times are illustrative.</span></p>
+<aside class="notes">The three sales lines are actual delivered records for product_id 1149 and store_id RUH-04 in qafila_oltp.sqlite (order_date is the Riyadh business date; net_amount = quantity * unit_price - discount). The stock numbers are hypothetical observations for the same IDs: the source has no inventory table. A periodic snapshot's grain is (product_id, store_id, date_day); stock is semi-additive: it can be summed across stores on one date, not across dates. The milestones of order 5000026 are hypothetical: created_at_utc comes from stg_orders, assigned_at_utc and delivered_at_utc from int_delivery_timeline. The accumulating row is updated in place, three versions of the same row, not three sales. Don't infer additivity from the fact type alone: accumulating facts mix counts, durations and amounts with different valid aggregations.</aside>
 </section>
 
 <section class="slide"><div class="kicker">Keys · The extra identifier</div><h2>One customer keeps its familiar source ID</h2><table class="t small"><thead><tr><th>customer_key · added in Lab 2.2</th><th>customer_id · from raw.customers</th><th>city · from raw.customers</th></tr></thead><tbody><tr><td>243</td><td>100253</td><td>Riyadh</td></tr><tr><td>675</td><td>100694</td><td>Jeddah</td></tr></tbody></table><ul class="bullets small"><li><b>Natural (source) key:</b> <code>customer_id</code> is the ID you already used in orders.</li><li><b>Surrogate key:</b> <code>customer_key</code> identifies a warehouse dimension row.</li><li>The dimension retains both IDs so we can look up the mapping.</li></ul><aside class="notes">The keys shown match the full-rebuild row_number mappings in Lab 2.2 for this dataset. Warehouse keys should be stable in a production load. SCD2 can use a different surrogate for each version of the same customer. Source-system collisions are another use, but do not introduce a second source system to this exercise.</aside></section>
-
-<section class="slide"><div class="kicker">Keys · A connection to Day 1</div><h2>The same customer can have two historical versions</h2><p class="small">Suppose customer <b>100253</b> moves city. This is an extension of the example.</p><table class="t small"><thead><tr><th>customer_key</th><th>customer_id</th><th>city</th><th>valid_from</th><th>valid_to</th></tr></thead><tbody><tr><td>243</td><td>100253</td><td>Riyadh</td><td>Aug 1</td><td>Sep 1</td></tr><tr><td>9001</td><td>100253</td><td>Jeddah</td><td>Sep 1</td><td>NULL</td></tr></tbody></table><table class="t small"><thead><tr><th>Order time</th><th>Assigned customer_key</th><th>Historical city</th></tr></thead><tbody><tr><td>Aug 20</td><td>243</td><td>Riyadh</td></tr><tr><td>Sep 10</td><td>9001</td><td>Jeddah</td></tr></tbody></table><div class="callout tip mt small"><b>Why this matters:</b> The familiar customer_id stays the same. A version key tells us which city applied when the order happened.</div><aside class="notes">This move and key 9001 are hypothetical, not claimed source records. Day 1 uses dim_customer_scd2 with customer_id, valid_from, valid_to, and is_current. It uses an as-of join on source ID plus time. This slide illustrates adding version surrogates to that same history. Lab 2.2 builds current attributes instead. Use half-open validity intervals and ensure versions do not overlap.</aside></section>
 
 <section class="slide"><div class="kicker">Keys · The unknown member</div><h2>A missing customer should not erase an order</h2><div class="cols cols-2"><div><h3>star.dim_customer</h3><table class="t small"><thead><tr><th>customer_key</th><th>customer_id</th><th>city</th></tr></thead><tbody><tr><td>-1</td><td>-1</td><td>Unknown</td></tr><tr><td>243</td><td>100253</td><td>Riyadh</td></tr></tbody></table><p class="small mt">Add the Unknown row before loading facts.</p></div><div><pre class="code s" data-file="Lab 2.2 · Type 1 lookup"><code class="language-sql">SELECT o.order_id,
        COALESCE(c.customer_key, -1) AS customer_key
@@ -152,30 +135,6 @@ WHERE o.order_id IN (5000026, 5000422);</code></pre><table class="t small"><thea
 <h2>A reconciliation checks rows as well as money</h2>
 <table class="t small"><thead><tr><th>Check</th><th>Expected in our example</th><th>What a mismatch can reveal</th></tr></thead><tbody><tr><td>Fact row count</td><td>3 source lines = 3 fact lines</td><td>A dropped row or multiplying join</td></tr><tr><td>Fact key uniqueness</td><td>No repeated (order_id, line_no)</td><td>A grain violation</td></tr><tr><td>Line net total</td><td>309.51 SAR in source and fact</td><td>A filter, calculation, or join difference</td></tr><tr><td>Rows assigned to Unknown</td><td>Explain and monitor them</td><td>Missing source references</td></tr></tbody></table><div class="callout tip mt small"><b>Why this matters:</b> Use the same time range, status rules, and quantity rules on both sides of the comparison.</div>
 <aside class="notes">Counts and totals are complementary: equal counts can hide one dropped and one duplicated row, while equal totals can hide offsetting errors. Lab 2.2 retains all quantities for the modeling exercise. The dbt mart filters quantity &gt; 0 and quarantines non-positive quantities. Reconcile that curated mart against the correspondingly filtered source, not all raw rows.</aside>
-</section>
-
-<section class="slide">
-<div class="kicker">Using the star for another question</div>
-<h2>The date dimension supports daily comparisons</h2>
-<pre class="code s" data-file="Lab 2.2: compare average daily revenue"><code class="language-sql">WITH daily AS (
-  SELECT d.date_day, d.is_weekend, s.city,
-         SUM(f.net_amount) AS revenue
-  FROM star.fct_order_items f
-  JOIN star.dim_date d USING (date_key)
-  JOIN star.dim_store s USING (store_key)
-  WHERE f.order_status = 'delivered'
-  GROUP BY d.date_day, d.is_weekend, s.city
-)
-SELECT city, is_weekend, AVG(revenue) AS avg_daily_revenue
-FROM daily GROUP BY city, is_weekend;</code></pre><div class="callout tip mt small"><b>Why this matters:</b> First total each day. Then average those daily totals, so days with more order lines do not get extra weight.</div>
-<aside class="notes">The lab defines Friday and Saturday as the weekend and flags September 23 for its National Day comparison. The query averages observed sales days. If a city has zero-sales days, build a complete calendar-by-city set and fill those daily totals with zero before averaging. Lab dim_store city is store city.</aside>
-</section>
-
-<section class="slide">
-<div class="kicker">Other choices</div>
-<h2>Other modeling styles change the tradeoffs</h2>
-<table class="t small"><thead><tr><th>Style</th><th>How it organizes data</th><th>Tradeoff</th></tr></thead><tbody><tr><td>Star</td><td>Facts connect to descriptive dimensions</td><td>Reusable analytical structure, requires grain discipline</td></tr><tr><td>Snowflake</td><td>Some dimensions refer to other dimensions</td><td>Less repeated hierarchy data, more joins</td></tr><tr><td>One big table</td><td>Prejoin measures and descriptions</td><td>Convenient for a workload, repeats attributes</td></tr><tr><td>Data Vault</td><td>Separate business keys, relationships, and history</td><td>Integration and traceability, often needs serving marts</td></tr></tbody></table><p class="small mt">The labs use a star. The optional stretch compares it with a wide table.</p>
-<aside class="notes">These are modeling patterns, not a ranking by speed. An OBT can sit on a star for a particular consumer. Historical attribute changes require an explicit refresh or versioning strategy. Data Vault often supports integration upstream of dimensional marts.</aside>
 </section>
 
 <section class="slide quiz">

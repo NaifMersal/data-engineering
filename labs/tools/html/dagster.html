@@ -7813,19 +7813,19 @@ warehouse.</p>
 <p><strong>Rhythm:</strong> 🤔 predict → run → 🔍 read.</p>
 <p><strong>Exercises (✏️):</strong> uncomment the template (<code>Ctrl+/</code>), replace every <code>___</code>, delete the two <code>YOUR CODE HERE</code> lines,
 then run the cell and the check after it (✅ = right). Answers: <code>solutions/tools/dagster.ipynb</code>.</p>
-<p><strong>Contents</strong></p>
+<p><strong>Contents</strong> · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 27'</p>
 <ul>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · The problem: a nightly script</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The mental model: assets, not tasks</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · Hello world</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · A graph of tables, and running part of it</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Every run is recorded</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · Resources: the same code in dev and prod</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Partitions: one day at a time, and backfills</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Asset checks: stop bad data spreading</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · When runs start: schedules, sensors, retries</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>10 · dbt in the graph</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>11 · Back to the map</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · The problem: a nightly script · 🎯 3'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The mental model: assets, not tasks · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · Hello world · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · A graph of tables, and running part of it · 🎯 4'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Every run is recorded · 🎯 3' · ➕ the hand edit</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · Resources: the same code in dev and prod · ➕</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Partitions: one day at a time, and backfills · 🎯 4' · ➕ the append re-run</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Asset checks: stop bad data spreading · 🎯 4', Ex. 2 filled in together</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · When runs start: schedules, sensors, retries · 🎯 1' (Lab 4.1 writes a sensor) · ➕ the rest</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>10 · dbt in the graph · 🎯 3'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>11 · Back to the map · 🎯 1'</li>
 </ul>
 </div>
 </div>
@@ -9608,7 +9608,7 @@ at the data itself. Put the table right before moving on:</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="6-%C2%B7-Resources:-the-same-code-in-dev-and-prod">6 · Resources: the same code in dev and prod<a class="anchor-link" href="#6-%C2%B7-Resources:-the-same-code-in-dev-and-prod">¶</a></h2><p>The assets above use <code>DB</code>, a path fixed in the notebook. In production the same assets write to another warehouse,
+<h2 id="6-%C2%B7-Resources:-the-same-code-in-dev-and-prod-%E2%9E%95">6 · Resources: the same code in dev and prod ➕<a class="anchor-link" href="#6-%C2%B7-Resources:-the-same-code-in-dev-and-prod-%E2%9E%95">¶</a></h2><p>The assets above use <code>DB</code>, a path fixed in the notebook. In production the same assets write to another warehouse,
 with other credentials. A <strong>resource</strong> is an object Dagster hands to every asset that asks for it by name; which one
 it gets is chosen when you run.</p>
 </div>
@@ -10171,8 +10171,8 @@ metadata. Here: no order may have a negative amount.</p>
 <code>city_report</code> and <code>store_ranking</code> were all built with the -12.00 in them. A check that only reports suits a rule
 someone should look at. For a rule whose failure would put wrong numbers in front of finance, make it <strong>blocking</strong>:
 if it fails, nothing downstream of its asset runs.</p>
-<p>✏️ <strong>Exercise 2</strong> · Write <code>no_negative_amounts_blocking</code>: the same check as above, but <strong>blocking</strong>. Then materialize
-<code>PIPELINE</code> with it and store the result in <code>result2</code>.</p>
+<p>✏️ <strong>Exercise 2</strong> (🎯 together in class) · Write <code>no_negative_amounts_blocking</code>: the same check as above, but
+<strong>blocking</strong>. Then materialize <code>PIPELINE</code> with it and store the result in <code>result2</code>.</p>
 <ul>
 <li><strong>Check yourself:</strong> the run fails; <code>raw/orders</code> and <code>raw/stores</code> are materialized, the three marts are not.</li>
 </ul>

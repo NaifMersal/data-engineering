@@ -12,17 +12,19 @@
 # **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
 # then run the cell and the check after it (✅ = right). Answers: `solutions/tools/spark.ipynb`.
 #
-# | | Section | The one idea |
-# |---|---|---|
-# | 0 | The problem: do you need a cluster? | scale up first; scale out when you must |
-# | 1 | Why Spark: driver, executors, cores | split the data, send the work to many machines |
-# | 2 | Partitions are tasks | one partition on one core is one task |
-# | 3 | Lazy evaluation | transformations plan, actions run |
-# | 4 | Narrow vs. wide | a `groupBy` has to move rows: the shuffle |
-# | 5 | Joins | broadcast the small side, shuffle the big ones |
-# | 6 | Skew | one key, one huge task |
-# | 7 | Writing | one file per task |
-# | 8 | Back to the map | what Spark is for, and its neighbours |
+# **In class:** 🎯 walked, with minutes (core ≈ 25') · ➕ at your own pace, like the ✏️ exercises not done in class.
+#
+# | | Section | The one idea | In class |
+# |---|---|---|---|
+# | 0 | The problem: do you need a cluster? | scale up first; scale out when you must | 🎯 3' |
+# | 1 | Why Spark: driver, executors, cores | split the data, send the work to many machines | 🎯 2' |
+# | 2 | Partitions are tasks | one partition on one core is one task | 🎯 3' |
+# | 3 | Lazy evaluation | transformations plan, actions run | 🎯 3' |
+# | 4 | Narrow vs. wide | a `groupBy` has to move rows: the shuffle | 🎯 5' |
+# | 5 | Joins | broadcast the small side, shuffle the big ones | 🎯 4' |
+# | 6 | Skew | one key, one huge task | 🎯 2' |
+# | 7 | Writing | one file per task | 🎯 2' |
+# | 8 | Back to the map | what Spark is for, and its neighbours | 🎯 1' |
 #
 # ⚠️ Run this on **Colab** (Spark 4 needs Java 17+; on Colab the first Spark cell installs it, about a minute). Native
 # Windows can't run it; WSL can.
@@ -32,8 +34,8 @@
 #
 # - Start the first Spark cell (§1) while you introduce §0: on Colab it installs Java, about a minute.
 # - Open the Spark UI tab in §1 and keep it on screen; refresh it after each action.
-# - Walked in about 25' without the two exercises. Lab 3.2 does pruning, broadcast timing, salting and the
-#   small-files count: don't do those here.
+# - Core ≈ 25' (🎯 in the contents), without the two exercises. §6 shows skew only: Lab 3.2 does the salting.
+# - Lab 3.2 does pruning, broadcast timing, salting and the small-files count: don't do those here.
 
 # %%
 import os, sys, subprocess

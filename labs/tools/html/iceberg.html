@@ -7810,12 +7810,14 @@ on disk, one piece at a time, the way you would draw it on a lightboard: click <
 the history board, everything on a board is read from the table's own metadata files.</p>
 <p><strong>Exercises (✏️):</strong> uncomment the template (<code>Ctrl+/</code>), replace every <code>___</code>, delete the two <code>YOUR CODE HERE</code> lines,
 then run the cell and the check after it (✅ = right). Answers: <code>solutions/tools/iceberg.ipynb</code>.</p>
+<p><strong>In class:</strong> 🎯 walked, with minutes (core ≈ 25') · ➕ at your own pace, like the ✏️ exercises not done in class.</p>
 <table>
 <thead>
 <tr>
 <th></th>
 <th>Section</th>
 <th>The one idea</th>
+<th>In class</th>
 </tr>
 </thead>
 <tbody>
@@ -7823,71 +7825,85 @@ then run the cell and the check after it (✅ = right). Answers: <code>solutions
 <td></td>
 <td><strong>A · Why Iceberg had to exist</strong></td>
 <td></td>
+<td></td>
 </tr>
 <tr>
 <td>0</td>
 <td>How we got here</td>
 <td>databases → data lakes → Hive folders → a metadata layer</td>
+<td>🎯 1'</td>
 </tr>
 <tr>
 <td>1</td>
 <td>A folder is not a table</td>
 <td>readers see half-finished loads, no safe updates</td>
+<td>🎯 3'</td>
 </tr>
 <tr>
 <td></td>
 <td><strong>B · How it works, layer by layer</strong></td>
+<td></td>
 <td></td>
 </tr>
 <tr>
 <td>2</td>
 <td>The catalog</td>
 <td>one pointer per table</td>
+<td>🎯 3'</td>
 </tr>
 <tr>
 <td>3</td>
 <td>One commit, bottom-up</td>
 <td>data files → manifests → manifest list → metadata file → pointer swap; a crash before the swap shows nothing</td>
+<td>🎯 4'</td>
 </tr>
 <tr>
 <td>4</td>
 <td>Reading</td>
 <td>follow the pointers down, skip files from metadata alone</td>
+<td>🎯 4'</td>
 </tr>
 <tr>
 <td></td>
 <td><strong>C · What the layers buy you</strong></td>
+<td></td>
 <td></td>
 </tr>
 <tr>
 <td>5</td>
 <td>Delete one row</td>
 <td>copy-on-write: a new file, a new snapshot</td>
+<td>🎯 2'</td>
 </tr>
 <tr>
 <td>6</td>
 <td>Time travel</td>
 <td>every snapshot is a version you can read</td>
+<td>🎯 3'</td>
 </tr>
 <tr>
 <td>7</td>
 <td>Two writers</td>
 <td>optimistic concurrency: one compare-and-swap; conflicting rewrites fail</td>
+<td>🎯 2' one swap · ➕ conflicts</td>
 </tr>
 <tr>
 <td>8</td>
 <td>Rename a column</td>
 <td>columns are tracked by id</td>
+<td>➕</td>
 </tr>
 <tr>
 <td>9</td>
 <td>Another engine</td>
 <td>DuckDB follows the same pointers</td>
+<td>🎯 2'</td>
 </tr>
 <tr>
 <td>10</td>
 <td>Back to the map</td>
 <td>the formats, the catalogs, and what Lab 3.1 adds</td>
+<td>🎯 1'</td>
 </tr>
 </tbody>
 </table>
@@ -10435,7 +10451,7 @@ snapshots. Do it. <code>tbl.snapshots()</code> lists them oldest first: the firs
 it read</strong>. The pointer had moved, so the swap failed (the "Commit failed … retrying" line). B re-read the new
 metadata, checked that A's append doesn't conflict with its own, and committed on top. Data files are never shared,
 so only the pointer swap needs to be serialized.</p>
-<h3 id="When-the-changes-do-conflict">When the changes do conflict<a class="anchor-link" href="#When-the-changes-do-conflict">¶</a></h3><p>Appends never conflict: each one adds its own files and removes nothing. Deletes and overwrites are different. They
+<h3 id="When-the-changes-do-conflict-%E2%9E%95">When the changes do conflict ➕<a class="anchor-link" href="#When-the-changes-do-conflict-%E2%9E%95">¶</a></h3><p>Appends never conflict: each one adds its own files and removes nothing. Deletes and overwrites are different. They
 <strong>remove</strong> files, and they were planned against the snapshot the writer read. So on retry the writer checks the
 commits it missed: <em>did any of them add or remove a file my filter could match?</em> If so, it <strong>fails</strong> instead of
 committing a change it planned on data that has since changed.</p>
@@ -10636,7 +10652,7 @@ orchestrator does that retry for you.)</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="8-%C2%B7-Rename-a-column-without-touching-the-data">8 · Rename a column without touching the data<a class="anchor-link" href="#8-%C2%B7-Rename-a-column-without-touching-the-data">¶</a></h2><p>The app team renames <code>method</code> to <code>payment_method</code>.</p>
+<h2 id="8-%C2%B7-Rename-a-column-without-touching-the-data-%E2%9E%95">8 · Rename a column without touching the data ➕<a class="anchor-link" href="#8-%C2%B7-Rename-a-column-without-touching-the-data-%E2%9E%95">¶</a></h2><p>The app team renames <code>method</code> to <code>payment_method</code>.</p>
 <p>🤔 How many Parquet files does Iceberg rewrite?</p>
 </div>
 </div>

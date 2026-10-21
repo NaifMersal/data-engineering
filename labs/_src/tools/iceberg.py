@@ -13,22 +13,24 @@
 # **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
 # then run the cell and the check after it (✅ = right). Answers: `solutions/tools/iceberg.ipynb`.
 #
-# | | Section | The one idea |
-# |---|---|---|
-# | | **A · Why Iceberg had to exist** | |
-# | 0 | How we got here | databases → data lakes → Hive folders → a metadata layer |
-# | 1 | A folder is not a table | readers see half-finished loads, no safe updates |
-# | | **B · How it works, layer by layer** | |
-# | 2 | The catalog | one pointer per table |
-# | 3 | One commit, bottom-up | data files → manifests → manifest list → metadata file → pointer swap; a crash before the swap shows nothing |
-# | 4 | Reading | follow the pointers down, skip files from metadata alone |
-# | | **C · What the layers buy you** | |
-# | 5 | Delete one row | copy-on-write: a new file, a new snapshot |
-# | 6 | Time travel | every snapshot is a version you can read |
-# | 7 | Two writers | optimistic concurrency: one compare-and-swap; conflicting rewrites fail |
-# | 8 | Rename a column | columns are tracked by id |
-# | 9 | Another engine | DuckDB follows the same pointers |
-# | 10 | Back to the map | the formats, the catalogs, and what Lab 3.1 adds |
+# **In class:** 🎯 walked, with minutes (core ≈ 25') · ➕ at your own pace, like the ✏️ exercises not done in class.
+#
+# | | Section | The one idea | In class |
+# |---|---|---|---|
+# | | **A · Why Iceberg had to exist** | | |
+# | 0 | How we got here | databases → data lakes → Hive folders → a metadata layer | 🎯 1' |
+# | 1 | A folder is not a table | readers see half-finished loads, no safe updates | 🎯 3' |
+# | | **B · How it works, layer by layer** | | |
+# | 2 | The catalog | one pointer per table | 🎯 3' |
+# | 3 | One commit, bottom-up | data files → manifests → manifest list → metadata file → pointer swap; a crash before the swap shows nothing | 🎯 4' |
+# | 4 | Reading | follow the pointers down, skip files from metadata alone | 🎯 4' |
+# | | **C · What the layers buy you** | | |
+# | 5 | Delete one row | copy-on-write: a new file, a new snapshot | 🎯 2' |
+# | 6 | Time travel | every snapshot is a version you can read | 🎯 3' |
+# | 7 | Two writers | optimistic concurrency: one compare-and-swap; conflicting rewrites fail | 🎯 2' one swap · ➕ conflicts |
+# | 8 | Rename a column | columns are tracked by id | ➕ |
+# | 9 | Another engine | DuckDB follows the same pointers | 🎯 2' |
+# | 10 | Back to the map | the formats, the catalogs, and what Lab 3.1 adds | 🎯 1' |
 #
 # The boards are HTML players: run the notebook in Jupyter, VS Code or Colab (GitHub's preview won't show them).
 
@@ -36,7 +38,8 @@
 # 🎓 **Instructor notes** (solution notebook only)
 #
 # - Walked as a lightboard: ask each 🤔 **before** running the cell, then step through the board with **Next ▶** and
-#   talk over each step. About 25' in class without the exercises; the three ✏️ are for the students' own pace.
+#   talk over each step. Core ≈ 25' (🎯 in the contents): §8 and the conflict half of §7 are ➕, like the three ✏️.
+# - In class, run the cells of a ➕ section without stopping on them: later cells may use what they build.
 # - Stop at ① on the commit board (§3) and ask "if the job died right here, what would a reader see?".
 # - Lab 3.1 creates the partitioned table, upserts refunds, erases a customer, time-travels per snapshot, evolves the
 #   schema **and the partitioning**, and reads from DuckDB and Polars: don't do those here.
@@ -474,7 +477,7 @@ V.iceberg_race(v_start, writer_a.metadata_location, tbl.metadata_location)
 # metadata, checked that A's append doesn't conflict with its own, and committed on top. Data files are never shared,
 # so only the pointer swap needs to be serialized.
 #
-# ### When the changes do conflict
+# ### When the changes do conflict ➕
 #
 # Appends never conflict: each one adds its own files and removes nothing. Deletes and overwrites are different. They
 # **remove** files, and they were planned against the snapshot the writer read. So on retry the writer checks the
@@ -537,7 +540,7 @@ left = tbl.scan(row_filter=f"payment_id in ('{x}', '{y}')").to_arrow().num_rows
 print("payments X and Y left in the table:", left)
 
 # %% [markdown]
-# ## 8 · Rename a column without touching the data
+# ## 8 · Rename a column without touching the data ➕
 #
 # The app team renames `method` to `payment_method`.
 #

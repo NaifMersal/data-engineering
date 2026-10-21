@@ -7810,17 +7810,17 @@ files few enough to check by eye (for everything else). Lab 1.1 then points the 
 <p><strong>Rhythm:</strong> 🤔 predict → run → 🔍 read.</p>
 <p><strong>Exercises (✏️):</strong> uncomment the template (<code>Ctrl+/</code>), replace every <code>___</code>, delete the two <code>YOUR CODE HERE</code> lines,
 then run the cell and the check after it (✅ = right). Answers: <code>solutions/tools/duckdb.ipynb</code>.</p>
-<p><strong>Contents</strong></p>
+<p><strong>Contents</strong> · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 24'</p>
 <ul>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · The problem: analytics on the app database</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The mental model: in-process, columnar, vectorized</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · Hello world: a query, a connection, a database file</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · Files where they are: CSV, globs, JSON, Parquet</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Tables, views, other databases, and one writer at a time</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · Python in and out: DataFrames, relations, parameters</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Friendly SQL</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Read the plan: EXPLAIN and EXPLAIN ANALYZE</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · Back to the map</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · The problem: analytics on the app database · 🎯 4'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The mental model: in-process, columnar, vectorized · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · Hello world: a query, a connection, a database file · 🎯 3'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · Files where they are: CSV, globs, JSON, Parquet · 🎯 6' CSV sniffing, the glob trap · ➕ JSON, Parquet</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Tables, views, other databases, and one writer at a time · 🎯 4' one writer · ➕ views, <code>ATTACH</code></li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · Python in and out: DataFrames, relations, parameters · 🎯 3' · ➕ parameters</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Friendly SQL · ➕</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Read the plan: EXPLAIN and EXPLAIN ANALYZE · ➕ (Lab 1.2's stretch reads a plan)</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · Back to the map · 🎯 2'</li>
 </ul>
 </div>
 </div>
@@ -9866,7 +9866,7 @@ store sold in) and <code>met</code> (<code>revenue &gt;= daily_target * days</co
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="7-%C2%B7-Friendly-SQL">7 · Friendly SQL<a class="anchor-link" href="#7-%C2%B7-Friendly-SQL">¶</a></h2><p>DuckDB's SQL is PostgreSQL-like, plus shortcuts that make exploring faster. The labs use them, so here they are once.</p>
+<h2 id="7-%C2%B7-Friendly-SQL-%E2%9E%95">7 · Friendly SQL ➕<a class="anchor-link" href="#7-%C2%B7-Friendly-SQL-%E2%9E%95">¶</a></h2><p>DuckDB's SQL is PostgreSQL-like, plus shortcuts that make exploring faster. The labs use them, so here they are once.</p>
 </div>
 </div>
 </div>
@@ -10094,7 +10094,7 @@ store sold in) and <code>met</code> (<code>revenue &gt;= daily_target * days</co
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="8-%C2%B7-Read-the-plan:-EXPLAIN-and-EXPLAIN-ANALYZE">8 · Read the plan: EXPLAIN and EXPLAIN ANALYZE<a class="anchor-link" href="#8-%C2%B7-Read-the-plan:-EXPLAIN-and-EXPLAIN-ANALYZE">¶</a></h2><p>DuckDB turns your SQL into a <strong>plan</strong>: a tree of operators, read <strong>from the bottom up</strong>: scan, filter, aggregate,
+<h2 id="8-%C2%B7-Read-the-plan:-EXPLAIN-and-EXPLAIN-ANALYZE-%E2%9E%95">8 · Read the plan: EXPLAIN and EXPLAIN ANALYZE ➕<a class="anchor-link" href="#8-%C2%B7-Read-the-plan:-EXPLAIN-and-EXPLAIN-ANALYZE-%E2%9E%95">¶</a></h2><p>DuckDB turns your SQL into a <strong>plan</strong>: a tree of operators, read <strong>from the bottom up</strong>: scan, filter, aggregate,
 project. <code>EXPLAIN</code> shows the plan without running it. We write the big orders table to Parquet and ask §1's question
 of the file.</p>
 </div>

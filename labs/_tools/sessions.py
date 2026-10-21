@@ -24,7 +24,8 @@ DAYS = {
 }
 BREAKS = {1: "Break · 10 min", 2: "Break · 20 min", 3: "Break · 10 min"}   # after sessions 1, 2, 3
 
-# teach: a tool walkthrough (labs/tools/<name>.ipynb) or a concept deck (slides/<name>.html)
+# teach: a tool walkthrough (labs/tools/<name>.ipynb) or a concept deck (slides/<name>.html);
+# opens_with: (tool, section) of another walkthrough taught first in the same session
 SESSIONS = [
     dict(id="D1_1", title="The modern data platform", stage="Store · query", tool="duckdb",
          topics="OLTP vs. OLAP, an analytical database in a library, files in place, plans",
@@ -43,8 +44,8 @@ SESSIONS = [
     dict(id="D2_3", title="dbt: transformation as software", stage="Silver → gold", tool="dbt",
          topics="sources, refs, layers, materializations, incremental models, macros, lineage",
          lab="D2_3_dbt_project"),
-    dict(id="D2_4", title="Testing & data quality", stage="Test", tool="pandera",
-         topics="Pandera schemas, quarantine; dbt tests, unit tests, contracts (taught in tools/dbt)",
+    dict(id="D2_4", title="Testing & data quality", stage="Test", tool="pandera", opens_with=("dbt", "§9"),
+         topics="dbt tests, warn vs. error, contracts, unit tests; Pandera schemas, quarantine",
          lab="D2_4_data_quality"),
     dict(id="D3_1", title="Open table formats & the lakehouse", stage="Store (lakehouse)", tool="iceberg",
          topics="Iceberg metadata, snapshots, time travel, concurrency, schema and partition evolution",
@@ -102,6 +103,10 @@ def html_rows(day: int) -> str:
             teach = (f'<span class="fmt" title="tool walkthrough, no slides">📓</span> '
                      f'{a(COLAB + "tools/" + t + ".ipynb", "tools/" + t)} '
                      f'<span class="alt">· {a("labs/tools/html/" + t + ".html", "read")}</span>')
+            if "opens_with" in s:
+                o, sec = s["opens_with"]
+                teach = teach.replace("</span> ", f'</span> {a(COLAB + "tools/" + o + ".ipynb", "tools/" + o)} '
+                                                  f'{esc(sec)}, then ', 1)
         else:
             teach = f'<span class="fmt" title="concept deck">🖥️</span> {a("slides/" + s["deck"] + ".html", "slides")}'
             if "demo" in s:
@@ -129,6 +134,9 @@ def markdown_rows() -> str:
         if "tool" in s:
             t = s["tool"]
             teach = f"📓 [`tools/{t}.ipynb`]({COLAB}tools/{t}.ipynb): {TOOL_TITLES[t]}"
+            if "opens_with" in s:
+                o, sec = s["opens_with"]
+                teach = f"📓 [`tools/{o}.ipynb`]({COLAB}tools/{o}.ipynb) {sec}, then " + teach[2:]
         else:
             teach = f"🖥️ [slides]({PAGES}slides/{s['deck']}.html)"
             if "demo" in s:

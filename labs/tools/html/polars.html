@@ -7811,20 +7811,20 @@ app database and the courier feed. Lab 2.1 then cleans the messy parts (timestam
 <p><strong>Rhythm:</strong> 🤔 predict → run → 🔍 read. Write your prediction down before you run the cell.</p>
 <p><strong>Exercises (✏️):</strong> uncomment the template (<code>Ctrl+/</code>), replace every <code>___</code>, delete the two <code>YOUR CODE HERE</code> lines,
 then run the cell and the check after it (✅ = right). Answers: <code>solutions/tools/polars.ipynb</code>.</p>
-<p><strong>Contents</strong></p>
+<p><strong>Contents</strong> · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 27'</p>
 <ul>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · The problem: a question answered by a loop</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The mental model: you write the rules, the engine runs them</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · Hello world: a DataFrame is a table of typed columns</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · Expressions and <code>select</code></li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · <code>filter</code>: keep the rows you want</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · <code>with_columns</code>: add and fix columns</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · <code>group_by</code> + <code>agg</code>: one row per group</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Joins: combine tables</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · <code>over</code>: group answers without collapsing rows</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>10 · Lazy mode: describe the query, let Polars plan it</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>11 · Put it together: one question, one chain</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>12 · Back to the map</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · The problem: a question answered by a loop · 🎯 3'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The mental model: you write the rules, the engine runs them · 🎯 3'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · Hello world: a DataFrame is a table of typed columns · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · Expressions and <code>select</code> · 🎯 4', Ex. 2 filled in together</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · <code>filter</code>: keep the rows you want · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · <code>with_columns</code>: add and fix columns · 🎯 2'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · <code>group_by</code> + <code>agg</code>: one row per group · 🎯 3'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Joins: combine tables · 🎯 2' one join · ➕ orphans</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · <code>over</code>: group answers without collapsing rows · ➕</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>10 · Lazy mode: describe the query, let Polars plan it · 🎯 5'</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>11 · Put it together: one question, one chain · ➕</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>12 · Back to the map · 🎯 1'</li>
 </ul>
 <p>Know pandas? Polars looks similar but thinks differently: there is no index, nothing is changed in place (every
 method returns a new DataFrame), and you describe columns with <strong>expressions</strong> instead of indexing with <code>df[...]</code>.
@@ -8810,7 +8810,8 @@ with an aggregate?</p>
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p>🔍 One row when everything aggregates. When one expression returns 45,766 values and another returns one, Polars
 repeats (<strong>broadcasts</strong>) the single value on every row, like SQL's <code>avg(delivery_fee) OVER ()</code>.</p>
-<p>✏️ <strong>Exercise 2</strong> · Compute the amount of every order line: <code>quantity * unit_price - discount</code>, rounded to 2 decimals.</p>
+<p>✏️ <strong>Exercise 2</strong> (🎯 together in class) · Compute the amount of every order line: <code>quantity * unit_price - discount</code>,
+rounded to 2 decimals.</p>
 <ul>
 <li><strong>Result:</strong> <code>lines</code>, one row per line of <code>items</code>, columns <code>order_id</code>, <code>line_no</code>, <code>line_total</code>.</li>
 <li><strong>Check yourself:</strong> order 5000001's first line is 2 × 49.20 SAR = 98.4.</li>
@@ -9896,7 +9897,7 @@ the city), then aggregate:</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="9-%C2%B7-over:-group-answers-without-collapsing-rows">9 · <code>over</code>: group answers without collapsing rows<a class="anchor-link" href="#9-%C2%B7-over:-group-answers-without-collapsing-rows">¶</a></h2><p><code>group_by</code> gives one row per group. Sometimes you want the group's answer <strong>next to each row</strong> instead: "what share of
+<h2 id="9-%C2%B7-over:-group-answers-without-collapsing-rows-%E2%9E%95">9 · <code>over</code>: group answers without collapsing rows ➕<a class="anchor-link" href="#9-%C2%B7-over:-group-answers-without-collapsing-rows-%E2%9E%95">¶</a></h2><p><code>group_by</code> gives one row per group. Sometimes you want the group's answer <strong>next to each row</strong> instead: "what share of
 its city's revenue does this store make?" That's <code>.over(...)</code>, Polars' window function: <code>pl.col("revenue").sum() .over("city")</code> is SQL's <code>sum(revenue) OVER (PARTITION BY city)</code> (<code>00_sql_windows</code>, Task 1).</p>
 <p>🤔 <strong>Predict</strong> · How many rows will this return: 3 (one per city) or 12?</p>
 </div>
@@ -10359,7 +10360,7 @@ good habit: <strong>eager to explore</strong> a sample, <strong>lazy for the pip
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p>Those counts are a little too high, by the way: the courier feed contains <strong>redelivered</strong> copies of some events. Lab
 2.1 removes them, with the same lazy chain plus one <code>unique</code> step.</p>
-<h2 id="11-%C2%B7-Put-it-together:-one-question,-one-chain">11 · Put it together: one question, one chain<a class="anchor-link" href="#11-%C2%B7-Put-it-together:-one-question,-one-chain">¶</a></h2><p><em>What is the average delivered basket per city, in September?</em> Everything you need is above: a filter, a join, a
+<h2 id="11-%C2%B7-Put-it-together:-one-question,-one-chain-%E2%9E%95">11 · Put it together: one question, one chain ➕<a class="anchor-link" href="#11-%C2%B7-Put-it-together:-one-question,-one-chain-%E2%9E%95">¶</a></h2><p><em>What is the average delivered basket per city, in September?</em> Everything you need is above: a filter, a join, a
 derived column, an aggregation. This time the template only gives you the steps.</p>
 <p>✏️ <strong>Exercise 9</strong> · Build <code>basket_by_city</code> as <strong>one lazy chain</strong> starting from <code>orders.lazy()</code>:</p>
 <ol>

@@ -16,24 +16,27 @@
 # **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
 # then run the cell and the check after it (✅ = right). Answers: `solutions/tools/dagster.ipynb`.
 #
-# **Contents**
-# - [ ] 1 · The problem: a nightly script
-# - [ ] 2 · The mental model: assets, not tasks
-# - [ ] 3 · Hello world
-# - [ ] 4 · A graph of tables, and running part of it
-# - [ ] 5 · Every run is recorded
-# - [ ] 6 · Resources: the same code in dev and prod
-# - [ ] 7 · Partitions: one day at a time, and backfills
-# - [ ] 8 · Asset checks: stop bad data spreading
-# - [ ] 9 · When runs start: schedules, sensors, retries
-# - [ ] 10 · dbt in the graph
-# - [ ] 11 · Back to the map
+# **Contents** · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 27'
+# - [ ] 1 · The problem: a nightly script · 🎯 3'
+# - [ ] 2 · The mental model: assets, not tasks · 🎯 2'
+# - [ ] 3 · Hello world · 🎯 2'
+# - [ ] 4 · A graph of tables, and running part of it · 🎯 4'
+# - [ ] 5 · Every run is recorded · 🎯 3' · ➕ the hand edit
+# - [ ] 6 · Resources: the same code in dev and prod · ➕
+# - [ ] 7 · Partitions: one day at a time, and backfills · 🎯 4' · ➕ the append re-run
+# - [ ] 8 · Asset checks: stop bad data spreading · 🎯 4', Ex. 2 filled in together
+# - [ ] 9 · When runs start: schedules, sensors, retries · 🎯 1' (Lab 4.1 writes a sensor) · ➕ the rest
+# - [ ] 10 · dbt in the graph · 🎯 3'
+# - [ ] 11 · Back to the map · 🎯 1'
 
 # %% [markdown] 🎓
 # 🎓 **Instructor notes** (solution notebook only)
 #
-# - Sections 1–4 and 8 carry the session: the script breaking, the graph, selection, and a blocking check. 5–7 and 9
-#   are short (one idea each); 10 bridges to Lab 4.1, whose task 2 puts the real dbt project in the graph.
+# - Core ≈ 27' (🎯 in the contents). Sections 1–4 and 8 carry the session: the script breaking, the graph,
+#   selection, and a blocking check. 5, 7 and 9 are short (one idea each); 6 is ➕; 10 bridges to Lab 4.1, whose
+#   task 2 puts the real dbt project in the graph.
+# - Fill in Ex. 2 (the blocking check) together: §8's next cell and §10 use it. Ex. 1 and 3 are ➕.
+# - In class, run the cells of a ➕ section without stopping on them: later cells may use what they build.
 # - Don't write Lab 4.1's code here: its exercises are the delete-then-insert partition, the duplicate-events check
 #   and the supplier-file sensor with `run_key`. This notebook uses an upsert, a negative-amount check and a cursor.
 # - Expect "Airflow?": the most deployed orchestrator. Airflow 3 added assets too, but its unit is still the task;
@@ -446,7 +449,7 @@ result = dg.materialize(PIPELINE, selection=dg.AssetSelection.assets(store_ranki
 sql("SELECT * FROM store_ranking")
 
 # %% [markdown]
-# ## 6 · Resources: the same code in dev and prod
+# ## 6 · Resources: the same code in dev and prod ➕
 #
 # The assets above use `DB`, a path fixed in the notebook. In production the same assets write to another warehouse,
 # with other credentials. A **resource** is an object Dagster hands to every asset that asks for it by name; which one
@@ -583,8 +586,8 @@ V.asset_run(PIPELINE + [no_negative_amounts], result)
 # someone should look at. For a rule whose failure would put wrong numbers in front of finance, make it **blocking**:
 # if it fails, nothing downstream of its asset runs.
 #
-# ✏️ **Exercise 2** · Write `no_negative_amounts_blocking`: the same check as above, but **blocking**. Then materialize
-# `PIPELINE` with it and store the result in `result2`.
+# ✏️ **Exercise 2** (🎯 together in class) · Write `no_negative_amounts_blocking`: the same check as above, but
+# **blocking**. Then materialize `PIPELINE` with it and store the result in `result2`.
 # - **Check yourself:** the run fails; `raw/orders` and `raw/stores` are materialized, the three marts are not.
 
 # %%

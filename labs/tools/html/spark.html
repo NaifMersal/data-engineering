@@ -7810,12 +7810,14 @@ click <strong>Next ▶</strong> or <strong>▶ Play</strong>), then <strong>the 
 what Spark just returned. 🤔 = predict before you run the cell.</p>
 <p><strong>Exercises (✏️):</strong> uncomment the template (<code>Ctrl+/</code>), replace every <code>___</code>, delete the two <code>YOUR CODE HERE</code> lines,
 then run the cell and the check after it (✅ = right). Answers: <code>solutions/tools/spark.ipynb</code>.</p>
+<p><strong>In class:</strong> 🎯 walked, with minutes (core ≈ 25') · ➕ at your own pace, like the ✏️ exercises not done in class.</p>
 <table>
 <thead>
 <tr>
 <th></th>
 <th>Section</th>
 <th>The one idea</th>
+<th>In class</th>
 </tr>
 </thead>
 <tbody>
@@ -7823,46 +7825,55 @@ then run the cell and the check after it (✅ = right). Answers: <code>solutions
 <td>0</td>
 <td>The problem: do you need a cluster?</td>
 <td>scale up first; scale out when you must</td>
+<td>🎯 3'</td>
 </tr>
 <tr>
 <td>1</td>
 <td>Why Spark: driver, executors, cores</td>
 <td>split the data, send the work to many machines</td>
+<td>🎯 2'</td>
 </tr>
 <tr>
 <td>2</td>
 <td>Partitions are tasks</td>
 <td>one partition on one core is one task</td>
+<td>🎯 3'</td>
 </tr>
 <tr>
 <td>3</td>
 <td>Lazy evaluation</td>
 <td>transformations plan, actions run</td>
+<td>🎯 3'</td>
 </tr>
 <tr>
 <td>4</td>
 <td>Narrow vs. wide</td>
 <td>a <code>groupBy</code> has to move rows: the shuffle</td>
+<td>🎯 5'</td>
 </tr>
 <tr>
 <td>5</td>
 <td>Joins</td>
 <td>broadcast the small side, shuffle the big ones</td>
+<td>🎯 4'</td>
 </tr>
 <tr>
 <td>6</td>
 <td>Skew</td>
 <td>one key, one huge task</td>
+<td>🎯 2'</td>
 </tr>
 <tr>
 <td>7</td>
 <td>Writing</td>
 <td>one file per task</td>
+<td>🎯 2'</td>
 </tr>
 <tr>
 <td>8</td>
 <td>Back to the map</td>
 <td>what Spark is for, and its neighbours</td>
+<td>🎯 1'</td>
 </tr>
 </tbody>
 </table>
