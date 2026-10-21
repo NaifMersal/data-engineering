@@ -43,7 +43,7 @@ if IN_COLAB:
     if not Path("/content/data-engineering").exists():
         subprocess.run(["git", "clone", "-q", REPO_URL, "/content/data-engineering"], check=True)
     os.chdir("/content/data-engineering/labs")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "duckdb>=1.4,<2", "polars>=1.30"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "duckdb>=1.4", "polars>=1.30"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
         os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/
@@ -438,7 +438,7 @@ wh.sql("""
 # 🤔 **Predict** · It only wants to read. Does it get in?
 
 # %%
-READER = f"import duckdb; print(duckdb.connect(r'{DB}', read_only=True).sql('SELECT count(*) FROM orders').fetchone())"
+READER = f"import duckdb; print(duckdb.connect(r'{DB}', read_only=True).sql('SELECT count(*) FROM orders').fetchall()[0])"
 other = subprocess.run([sys.executable, "-c", READER], capture_output=True, text=True)
 print("❌" if other.returncode else "✅", other.stdout.strip() or first_error(other.stderr))
 
@@ -477,7 +477,7 @@ with duckdb.connect(str(DB)) as con_ex:
 # END SOLUTION
 
 # %%
-U.check(con.sql(f"SELECT count(*) FROM '{F}/delivered.parquet'").fetchone()[0] == 9, "9 delivered orders in the file")
+U.check(con.sql(f"SELECT count(*) FROM '{F}/delivered.parquet'").fetchall()[0][0] == 9, "9 delivered orders in the file")
 check_db = subprocess.run([sys.executable, "-c", READER.replace("FROM orders", "FROM delivered")],
                           capture_output=True, text=True)
 U.check(check_db.returncode == 0, "the database is free: another process could read it")
@@ -500,8 +500,12 @@ con.sql("SELECT * FROM targets WHERE daily_target > 40")
 # | `.df()` | a pandas DataFrame |
 # | `.pl()` | a Polars DataFrame (Day 2) |
 # | `.to_arrow_table()` | an Arrow table (PyIceberg, Day 3) |
-# | `.fetchall()`, `.fetchone()` | Python tuples |
+# | `.fetchall()` | a list of Python tuples |
 # | `.show()` | prints a preview |
+#
+# For one row, take the first: `.fetchall()[0]`. Older tutorials use `.fetchone()`, which relations lost in DuckDB
+# 2.0; and after `con.execute(...)`, read the whole result (`.fetchall()`, `.df()`): a half-read result keeps the
+# connection busy until you do.
 
 # %%
 result = con.sql("SELECT store_id, daily_target FROM targets ORDER BY store_id")
@@ -628,20 +632,22 @@ print(con.sql(f"""EXPLAIN SELECT store_id, sum(amount) FROM {BIG}
                   WHERE status = 'delivered' GROUP BY ALL""").fetchall()[0][1])
 
 # %% [markdown]
-# 🔍 Start at the bottom box. The `PARQUET_SCAN` already knows two things from the query:
+# 🔍 Start at the bottom box, the **Parquet Scan**. It already knows two things from the query:
 # - **Projections**: only `store_id` and `amount` are read. The other columns are never touched (columnar).
 # - **Filters**: `status='delivered'` is applied inside the scan, while reading (a **pushed-down** filter).
 #
-# Above it, a `HASH_GROUP_BY` sums per store. A `PROJECTION` only passes columns between operators. The `~` rows are
-# estimates: DuckDB guesses how many rows pass the filter before it reads anything.
+# Above it, a **Hash Group By** sums per store. A **Projection** only passes columns between operators. The `~` rows
+# are estimates: DuckDB guesses how many rows pass the filter before it reads anything. (DuckDB 1.x draws the same
+# tree with square boxes and names like `PARQUET_SCAN`, `HASH_GROUP_BY`.)
 #
-# `EXPLAIN ANALYZE` **runs** the query and adds the real rows and time of each operator.
+# `EXPLAIN ANALYZE` **runs** the query: a **Summary** box on top (total time, data read), then each operator with its
+# real rows and time. The cell prints the total time and the bottom box.
 
 # %%
 profile = con.sql(f"""EXPLAIN ANALYZE SELECT store_id, sum(amount) FROM {BIG}
                       WHERE status = 'delivered' GROUP BY ALL""").fetchall()[0][1]
 print(re.search(r"Total Time: \S+", profile).group())
-print(profile[profile.rindex("┌───"):])
+print(profile[profile.rindex("╭─"):])                     # the last box: the scan
 
 # %% [markdown]
 # 🔍 Now the rows are real: the scan produced only the delivered orders (the cancelled ones never left it), and each
@@ -653,7 +659,7 @@ print(profile[profile.rindex("┌───"):])
 
 # %%
 question = f"SELECT store_id, sum(amount) FROM {BIG} WHERE status = 'delivered' GROUP BY ALL"
-cores = con.sql("SELECT current_setting('threads')").fetchone()[0]
+cores = con.sql("SELECT current_setting('threads')").fetchall()[0][0]
 all_cores = U.best_of(lambda: con.sql(question).fetchall())
 con.sql("SET threads = 1")
 one_core = U.best_of(lambda: con.sql(question).fetchall())
@@ -694,7 +700,7 @@ V.platform_map(tool="duckdb")
 # |---|---|
 # | `duckdb.connect()` / `duckdb.connect("x.duckdb", read_only=True)` | in memory / a database file |
 # | `con.sql("...")` | a relation: runs when you ask for rows |
-# | `.df()`, `.pl()`, `.fetchall()`, `.fetchone()` | results as pandas, Polars, tuples |
+# | `.df()`, `.pl()`, `.fetchall()` | results as pandas, Polars, tuples |
 # | `FROM 'x.csv'`, `read_csv(..., types = {...})` | a file as a table; take the types into your own hands |
 # | `read_csv('*.csv', union_by_name = true, filename = true)` | many files, matched by column name, traced to their file |
 # | `CREATE TABLE t AS ...`, `CREATE VIEW v AS ...` | a copy / a saved query |

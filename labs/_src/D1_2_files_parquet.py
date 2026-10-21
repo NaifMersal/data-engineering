@@ -66,7 +66,7 @@ con.sql(f"""
     FROM base, range({SCALE}) r(k)
     ORDER BY hash(order_id + k, line_no)        -- deterministic shuffle
 """)
-n_rows = con.sql("SELECT count(*) FROM lines").fetchone()[0]
+n_rows = con.sql("SELECT count(*) FROM lines").fetchall()[0][0]
 print(f"{n_rows:,} rows x {len(con.table('lines').columns)} columns")
 
 # %% [markdown]
@@ -217,8 +217,8 @@ print(U.count_files(OUT / "by_date"), "files, e.g.", sorted(p.name for p in (OUT
 by_date = f"read_parquet('{O}/by_date/*/*.parquet', hive_partitioning = true)"
 one_day = f"SELECT count(*), sum(amount) FROM {by_date} WHERE order_date = '2026-09-23'"
 all_days = f"SELECT count(*), sum(amount) FROM {by_date}"
-print("one day :", con.sql(one_day).fetchone(), f"{U.best_of(lambda: con.sql(one_day).fetchall()) * 1000:.1f} ms")
-print("all days:", con.sql(all_days).fetchone(), f"{U.best_of(lambda: con.sql(all_days).fetchall()) * 1000:.1f} ms")
+print("one day :", con.sql(one_day).fetchall()[0], f"{U.best_of(lambda: con.sql(one_day).fetchall()) * 1000:.1f} ms")
+print("all days:", con.sql(all_days).fetchall()[0], f"{U.best_of(lambda: con.sql(all_days).fetchall()) * 1000:.1f} ms")
 U.check(U.count_files(OUT / "by_date") == 61, "one folder per day")
 
 # %% [markdown]

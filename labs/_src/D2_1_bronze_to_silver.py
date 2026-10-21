@@ -238,7 +238,7 @@ for f in sorted((OUT / "silver").glob("*.parquet")):
     print(f"{f.name:28s} {U.size_mb(f):5.2f} MB  {pl.scan_parquet(f).select(pl.len()).collect().item():,} rows")
 
 # %%
-check = duckdb.sql(f"SELECT count(*), count(DISTINCT event_id) FROM '{(OUT / 'silver' / 'delivery_events.parquet').as_posix()}'").fetchone()
+check = duckdb.sql(f"SELECT count(*), count(DISTINCT event_id) FROM '{(OUT / 'silver' / 'delivery_events.parquet').as_posix()}'").fetchall()[0]
 U.check(check[0] == check[1] == ev.height, "silver events readable by another engine, still unique")
 
 # %% [markdown]

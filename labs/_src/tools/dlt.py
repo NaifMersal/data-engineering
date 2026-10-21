@@ -43,7 +43,7 @@ if IN_COLAB:
     if not Path("/content/data-engineering").exists():
         subprocess.run(["git", "clone", "-q", REPO_URL, "/content/data-engineering"], check=True)
     os.chdir("/content/data-engineering/labs")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "duckdb>=1.4,<2", "dlt[duckdb]>=1.30"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "duckdb>=1.4", "dlt[duckdb]>=1.30"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
         os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/
@@ -163,7 +163,7 @@ by_hand.sql("SELECT count(*) AS rows, sum(amount) AS revenue FROM payments").df(
 # %%
 by_hand.execute("DROP TABLE payments")
 load_by_hand(provider(MON))
-cursor = by_hand.sql("SELECT max(updated_at) FROM payments").fetchone()[0]
+cursor = by_hand.sql("SELECT max(updated_at) FROM payments").fetchall()[0][0]
 print("cursor:", cursor)
 load_by_hand(provider(TUE, since=cursor))
 by_hand.sql("SELECT payment_id, status, updated_at FROM payments WHERE payment_id = 9003").df()
@@ -175,7 +175,7 @@ by_hand.sql("SELECT payment_id, status, updated_at FROM payments WHERE payment_i
 # 🤔 **Predict** · Wednesday the provider adds a field, `wallet_provider`. What does the loader do?
 
 # %%
-cursor = by_hand.sql("SELECT max(updated_at) FROM payments").fetchone()[0]
+cursor = by_hand.sql("SELECT max(updated_at) FROM payments").fetchall()[0][0]
 try:
     load_by_hand(provider(WED, since=cursor))
 except duckdb.Error as e:

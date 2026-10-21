@@ -285,7 +285,8 @@ U.check({"fct_order_items", "stg_orders"} <= set(parents), "fct_orders reads the
 #
 # Add `models/marts/mart_weekly_category.sql`: one row per ISO week and product category with delivered revenue and units,
 # built from `fct_order_items` and `dim_products`. Add a YAML entry with a description and a uniqueness test on
-# `iso_week || category`, then `dbt build --select mart_weekly_category`.
+# `iso_week || category`, then `dbt build --select dim_products mart_weekly_category` (nothing above built
+# `dim_products` yet).
 
 # %%
 # BEGIN SOLUTION
@@ -310,7 +311,7 @@ models:
           arguments:
             column_name: "iso_week || '|' || category"
 """.strip() + "\n", encoding="utf-8")
-dbt("build", "--select", "mart_weekly_category")
+dbt("build", "--select", "dim_products", "mart_weekly_category")
 display(sql("SELECT * FROM marts.mart_weekly_category ORDER BY iso_week DESC, revenue_sar DESC LIMIT 5"))
 # END SOLUTION
 

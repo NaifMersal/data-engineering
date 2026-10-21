@@ -54,6 +54,7 @@ import pandas as pd
 
 con = duckdb.connect()
 con.sql("SET enable_progress_bar = false")
+con.sql("SET TimeZone = 'UTC'")   # the sources' timestamps are UTC: read and cast them the same on any machine
 RAW = U.RAW.as_posix()
 
 # %% [markdown]
@@ -263,7 +264,7 @@ con.sql("""
         SELECT *, row_number() OVER (PARTITION BY lsn ORDER BY arrival) AS copy FROM changes
     ) WHERE copy = 1
 """)
-print(con.sql("SELECT count(*) FROM changes").fetchone()[0], "events ->", con.sql("SELECT count(*) FROM dedup").fetchone()[0], "after dedup")
+print(con.sql("SELECT count(*) FROM changes").fetchall()[0][0], "events ->", con.sql("SELECT count(*) FROM dedup").fetchall()[0][0], "after dedup")
 
 # %% [markdown]
 # ✏️ **Exercise 3** · Find each customer's **last** change: the row with the highest `lsn` for that customer.
@@ -429,7 +430,7 @@ frames
 #         FROM changes
 #     )
 #     WHERE lsn < max_before
-# """).fetchone()[0]
+# """).fetchall()[0][0]
 # BEGIN SOLUTION
 n_out_of_order = con.sql("""
     SELECT count(*) FROM (
@@ -437,7 +438,7 @@ n_out_of_order = con.sql("""
         FROM changes
     )
     WHERE lsn < max_before
-""").fetchone()[0]
+""").fetchall()[0][0]
 # END SOLUTION
 U.check(n_out_of_order == 1, f"{n_out_of_order} late event (lsn 18); the redelivered 22 is a duplicate, not late")
 
@@ -670,7 +671,7 @@ no_dedup[no_dedup.customer_id == 101]
 # %%
 con.sql(f"""
     CREATE TABLE courier AS
-    SELECT event_id, order_id, store_id, city, event_type, ingest_time,
+    SELECT event_id, order_id, store_id, city, event_type, ingest_time::TIMESTAMP AS ingest_time,
            coalesce(make_timestamp(try_cast(event_time AS BIGINT) * 1000),
                     try_cast(event_time AS TIMESTAMPTZ) AT TIME ZONE 'UTC') AS event_ts
     FROM read_json_auto('{RAW}/events/delivery_events.jsonl')
@@ -699,7 +700,7 @@ con.sql("""
 # END SOLUTION
 n_raw, n_ids, n_clean = con.sql("""
     SELECT (SELECT count(*) FROM courier), (SELECT count(DISTINCT event_id) FROM courier), (SELECT count(*) FROM courier_clean)
-""").fetchone()
+""").fetchall()[0]
 print(f"{n_raw:,} events received -> {n_clean:,} after dedup")
 U.check(n_clean == n_ids < n_raw, f"{n_raw - n_clean} redelivered copies removed")
 

@@ -48,7 +48,7 @@ RAW = U.RAW.as_posix()          # DuckDB likes forward slashes, also on Windows
 # %% [markdown]
 # ## 1 · Query CSV, JSON lines and SQLite in place (5')
 #
-# Qafila's data lives in several places (see the table on the course slides). DuckDB reads each of them where it is:
+# Qafila's data lives in several places (see "The data we use" in the intro deck, `slides/00_intro.html`). DuckDB reads each of them where it is:
 #
 # | Source | Path | DuckDB reader |
 # |---|---|---|
@@ -161,12 +161,12 @@ plt.show()
 dup_people = con.sql("""
     SELECT count(*) FROM (
         SELECT national_id FROM app.customers GROUP BY national_id HAVING count(*) > 1
-    )""").fetchone()[0]
+    )""").fetchall()[0][0]
 orphan_orders = con.sql("""
     SELECT count(*) FROM app.orders o
     LEFT JOIN app.customers c USING (customer_id)
-    WHERE c.customer_id IS NULL""").fetchone()[0]
-negative_lines = con.sql("SELECT count(*) FROM app.order_items WHERE quantity < 0").fetchone()[0]
+    WHERE c.customer_id IS NULL""").fetchall()[0][0]
+negative_lines = con.sql("SELECT count(*) FROM app.order_items WHERE quantity < 0").fetchall()[0][0]
 # END SOLUTION
 print(f"duplicate people: {dup_people} | orphan orders: {orphan_orders} | negative lines: {negative_lines}")
 U.check(dup_people > 40, "some people have several customer accounts")

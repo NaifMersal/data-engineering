@@ -75,15 +75,15 @@ con.sql("SELECT arrival, lsn, op, after.customer_id, after.city, after.mobile FR
 
 # %%
 # BEGIN SOLUTION
-n_duplicates = con.sql("SELECT count(*) - count(DISTINCT lsn) FROM changes").fetchone()[0]
+n_duplicates = con.sql("SELECT count(*) - count(DISTINCT lsn) FROM changes").fetchall()[0][0]
 n_out_of_order = con.sql("""
     SELECT count(*) FROM (
         SELECT lsn < max(lsn) OVER (ORDER BY arrival ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS late
         FROM changes
     ) WHERE late
-""").fetchone()[0]
+""").fetchall()[0][0]
 # END SOLUTION
-total = con.sql("SELECT count(*) FROM changes").fetchone()[0]
+total = con.sql("SELECT count(*) FROM changes").fetchall()[0][0]
 print(f"{total:,} events | {n_duplicates} duplicates | {n_out_of_order:,} out of order")
 U.check(n_duplicates > 100, "the connector redelivered some events")
 U.check(n_out_of_order > 1000, "arrival order is not commit order")
@@ -105,7 +105,7 @@ con.sql(f"""
         types = {{'mobile': 'VARCHAR', 'national_id': 'VARCHAR', 'iban': 'VARCHAR',
                   'created_at': 'VARCHAR', 'updated_at': 'VARCHAR'}})
 """)
-print("snapshot rows:", con.sql("SELECT count(*) FROM customers").fetchone()[0])
+print("snapshot rows:", con.sql("SELECT count(*) FROM customers").fetchall()[0][0])
 con.sql("DESCRIBE customers").df()[["column_name", "column_type"]].T
 
 # %% [markdown]
@@ -159,10 +159,10 @@ con.sql("SELECT op, count(*) AS customers FROM latest GROUP BY op ORDER BY op").
 
 # %%
 # BEGIN SOLUTION
-missing = con.sql("SELECT count(*) FROM (SELECT * FROM app.customers EXCEPT SELECT * FROM customers)").fetchone()[0]
-extra = con.sql("SELECT count(*) FROM (SELECT * FROM customers EXCEPT SELECT * FROM app.customers)").fetchone()[0]
+missing = con.sql("SELECT count(*) FROM (SELECT * FROM app.customers EXCEPT SELECT * FROM customers)").fetchall()[0][0]
+extra = con.sql("SELECT count(*) FROM (SELECT * FROM customers EXCEPT SELECT * FROM app.customers)").fetchall()[0][0]
 # END SOLUTION
-n_src, n_copy = con.sql("SELECT (SELECT count(*) FROM app.customers), (SELECT count(*) FROM customers)").fetchone()
+n_src, n_copy = con.sql("SELECT (SELECT count(*) FROM app.customers), (SELECT count(*) FROM customers)").fetchall()[0]
 print(f"source {n_src:,} rows | copy {n_copy:,} rows | missing {missing} | extra {extra}")
 U.check(missing == 0 and extra == 0, "the replica matches the source exactly")
 
@@ -215,7 +215,7 @@ stats = con.sql("""
 stats
 
 # %%
-erased = con.sql("SELECT count(*) FROM changes WHERE op = 'd'").fetchone()[0]
+erased = con.sql("SELECT count(*) FROM changes WHERE op = 'd'").fetchall()[0][0]
 U.check(stats.current_rows[0] == n_src, "one current version per live customer")
 U.check(stats.versions[0] > stats.customers[0], "changed customers have several versions")
 print(f"{erased} customers were erased: their versions are closed, but still here. Is that allowed? (see below)")
@@ -230,7 +230,7 @@ con.sql("""
     DELETE FROM dim_customer_scd2
     WHERE customer_id IN (SELECT before.customer_id FROM changes WHERE op = 'd')
 """)
-U.check(con.sql("SELECT count(*) FROM dim_customer_scd2 WHERE NOT is_current").fetchone()[0] > 0, "history kept for everyone else")
+U.check(con.sql("SELECT count(*) FROM dim_customer_scd2 WHERE NOT is_current").fetchall()[0][0] > 0, "history kept for everyone else")
 
 # %% [markdown]
 # ## 5 · As-of join: revenue by customer city at order time (3')
@@ -313,7 +313,7 @@ for lo, hi in zip(edges, edges[1:]):
     """)
 diff = con.sql("""SELECT count(*) FROM (
     (SELECT * FROM app.customers EXCEPT SELECT * EXCLUDE (_lsn) FROM customers_inc)
-    UNION ALL (SELECT * EXCLUDE (_lsn) FROM customers_inc EXCEPT SELECT * FROM app.customers))""").fetchone()[0]
+    UNION ALL (SELECT * EXCLUDE (_lsn) FROM customers_inc EXCEPT SELECT * FROM app.customers))""").fetchall()[0][0]
 print("differences after 4 batches:", diff)
 # END SOLUTION
 

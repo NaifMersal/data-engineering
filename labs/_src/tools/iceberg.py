@@ -77,6 +77,7 @@ pd.set_option("display.max_colwidth", 80)
 DEMO = U.lab_dir("tools_iceberg", reset=True)
 con = duckdb.connect()
 con.sql("SET enable_progress_bar = false")
+con.sql("SET TimeZone = 'UTC'")   # the sources' timestamps are UTC: read and cast them the same on any machine
 
 payments = con.sql(f"""
     SELECT payment_id, order_id, amount, method, status, created_at::TIMESTAMP AS created_at
@@ -591,18 +592,18 @@ V.iceberg_engines(tbl.metadata_location, [("PyIceberg", "wrote every commit", "c
 # Template:
 # aug3_then = con.sql(f"""
 #     SELECT count(*) FROM iceberg_scan('{___}') WHERE created_at::DATE = DATE '2026-08-03'
-# """).fetchone()[0]
+# """).fetchall()[0][0]
 # BEGIN SOLUTION
 aug3_then = con.sql(f"""
     SELECT count(*) FROM iceberg_scan('{v_s2}') WHERE created_at::DATE = DATE '2026-08-03'
-""").fetchone()[0]
+""").fetchall()[0][0]
 # END SOLUTION
 aug3_then
 
 # %%
 aug3_now = con.sql(f"""
     SELECT count(*) FROM iceberg_scan('{tbl.metadata_location}') WHERE created_at::DATE = DATE '2026-08-03'
-""").fetchone()[0]
+""").fetchall()[0][0]
 U.check(aug3_then == day(3).num_rows, "the old version still has every payment of 3 August")
 U.check(aug3_now < aug3_then, f"the current version has {aug3_then - aug3_now} fewer: the deletes of sections 5 and 7")
 

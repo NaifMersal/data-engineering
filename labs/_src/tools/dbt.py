@@ -50,7 +50,7 @@ if IN_COLAB:
         subprocess.run(["git", "clone", "-q", REPO_URL, "/content/data-engineering"], check=True)
     os.chdir("/content/data-engineering/labs")
     subprocess.run([sys.executable, "-m", "pip", "install", "-q",
-                    "duckdb>=1.4,<2", "dbt-core>=1.10,<2", "dbt-duckdb>=1.11"], check=True)
+                    "duckdb>=1.4", "dbt-core>=1.10,<2", "dbt-duckdb>=1.11"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
         os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/
@@ -195,7 +195,7 @@ by_hand.sql("FROM city_sales ORDER BY city").df()
 # %%
 by_hand.execute("UPDATE raw.orders SET status = 'delivered' WHERE order_id = 103")
 run_by_hand(by_hand, "city_sales.sql")
-stale = by_hand.sql("SELECT revenue_sar FROM city_sales WHERE city = 'Jeddah'").fetchone()[0]
+stale = by_hand.sql("SELECT revenue_sar FROM city_sales WHERE city = 'Jeddah'").fetchall()[0][0]
 U.check(float(stale) == 33.65, "no error, and Jeddah is still 33.65: the report was rebuilt from old tables")
 
 # %% [markdown]

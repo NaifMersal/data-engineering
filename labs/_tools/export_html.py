@@ -4,8 +4,8 @@
     uv run python _tools/export_html.py dbt        # one
 
 The pages are for reading without running (or when Colab is slow), so they keep every output and drop the
-instructor notes (markdown cells starting with 🎓). Local paths in the outputs (C:\\Users\\..., /mnt/c/..., /home/...)
-are shortened to `labs/`. Execute a solution notebook first if its outputs are stale.
+instructor notes (markdown cells starting with 🎓) and DuckDB's progress bars (widgets with no saved state). Local
+paths in the outputs (C:\\Users\\..., /mnt/c/..., /home/...) are shortened to `labs/`. Execute a solution notebook first if its outputs are stale.
 """
 
 from __future__ import annotations
@@ -52,6 +52,10 @@ def colab_links(html: str) -> str:
 def export(tool: str) -> Path:
     nb = nbformat.read(SOLUTIONS / f"{tool}.ipynb", as_version=4)
     nb.cells = [c for c in nb.cells if not (c.cell_type == "markdown" and c.source.lstrip().startswith("🎓"))]
+    nb.metadata.pop("widgets", None)
+    for c in nb.cells:
+        if c.cell_type == "code":
+            c.outputs = [o for o in c.outputs if "application/vnd.jupyter.widget-view+json" not in o.get("data", {})]
     exporter = HTMLExporter(template_name="lab")
     body, _ = exporter.from_notebook_node(nb, resources={"metadata": {"name": f"{tool} walkthrough"}})
     OUT.mkdir(parents=True, exist_ok=True)
