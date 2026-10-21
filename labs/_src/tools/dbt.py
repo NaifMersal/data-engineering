@@ -78,6 +78,13 @@ def execute_sql(statement):
         connection.execute(statement)
 
 # %% [markdown]
+# You are here: dbt **transforms** inside the warehouse (silver in `staging/`, gold in `marts/`) and **tests** what it
+# built; the documentation and lineage come from the same project.
+
+# %%
+V.platform_map(tool="dbt")
+
+# %% [markdown]
 # **Vocabulary:** database = the DuckDB file · schema = a namespace inside it (`raw`) · table = stored rows · view = a
 # stored query, run on every read.
 #

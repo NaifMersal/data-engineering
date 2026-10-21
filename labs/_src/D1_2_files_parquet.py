@@ -12,7 +12,7 @@
 # - [ ] 3 · Sorted vs. unsorted: count row groups skipped (5')
 # - [ ] 4 · Partition by date; query one day (5')
 # - [ ] 5 · Over-partition on purpose; measure the cost (4')
-# - [ ] ✱ Stretch · Same queries in Polars lazy mode; compare plans
+# - [ ] ✱ Stretch · Prove the partition caveat in the plan
 
 # %%
 import os, sys, subprocess
@@ -262,23 +262,36 @@ U.check(cost.full_scan_ms.iloc[2] > cost.full_scan_ms.iloc[0], "the over-partiti
 # and statistics. Partition by what you **load** and **filter** by most (usually a date), keep files large, and use
 # sorting for the rest.
 #
-# ## ✱ Stretch · Same queries in Polars lazy mode; compare plans
+# ## ✱ Stretch · Prove the partition caveat in the plan
 #
-# Polars builds a **lazy** query plan and optimizes it before reading anything. `explain()` shows the plan:
-# look for the projection (columns read) and the filter pushed into the Parquet scan.
+# Task 4 said engines only prune when you filter on the partition column itself. Check it: `EXPLAIN ANALYZE` prints
+# `Total Files Read` in the scan box. `files_read(query)` returns that number.
+#
+# ✏️ **Exercise** · On `by_date`, ask for 23 September twice: once with `order_date = '2026-09-23'`, once with the
+# `created_at` range of Task 3 (`DAY_FROM`, `DAY_TO`). Store the files read in `via_partition` and `via_timestamp`.
 
 # %%
-import polars as pl
+import re
+
+
+def files_read(query):
+    plan = con.sql("EXPLAIN ANALYZE " + query).fetchall()[0][1]
+    return int(re.search(r"Total Files Read: (\d+)", plan).group(1))
+
 
 # BEGIN SOLUTION
-plan = (pl.scan_parquet(f"{O}/sorted.parquet")
-          .filter(pl.col("status") == "delivered")
-          .group_by("city")
-          .agg(pl.col("amount").sum().round(0).alias("revenue"))
-          .sort("city"))
-print(plan.explain())
-print(plan.collect())
+via_partition = files_read(one_day)
+via_timestamp = files_read(f"SELECT count(*), sum(amount) FROM {by_date} "
+                           f"WHERE created_at >= '{DAY_FROM}' AND created_at < '{DAY_TO}'")
 # END SOLUTION
+print(f"files read · order_date filter: {via_partition} · created_at filter: {via_timestamp}")
+U.check(via_partition == 1, "the partition filter opens one folder")
+U.check(via_timestamp > via_partition, "the same day as a created_at filter opens more files")
+
+# %% [markdown]
+# 🔍 Same rows, same answer, but the engine can't know that `created_at` on 23 September lives in the folder
+# `order_date=2026-09-23`: it opens the files and checks their statistics. Filter on the partition column (dbt models
+# and dashboards often forget). Iceberg's **hidden partitioning** (Day 3) removes this trap.
 
 # %% [markdown]
 # ## Checkpoint

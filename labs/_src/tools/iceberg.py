@@ -82,6 +82,13 @@ print(f"{payments.num_rows:,} payments")
 payments.slice(0, 3).to_pandas()
 
 # %% [markdown]
+# You are here: Iceberg **stores**. It turns a folder of Parquet files into a table (bronze, silver or gold) that many
+# engines can read and change safely.
+
+# %%
+V.platform_map(tool="iceberg")
+
+# %% [markdown]
 # # Part A · Why Iceberg had to exist
 #
 # ## 0 · How we got here

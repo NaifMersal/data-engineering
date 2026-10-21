@@ -47,6 +47,13 @@ U.ensure_data()
 print("data:", U.RAW, "| quick mode:", U.QUICK)
 
 # %% [markdown]
+# You are here: Spark **transforms** at scale: the same work as DuckDB or Polars, spread over a cluster when one
+# machine is not enough.
+
+# %%
+V.platform_map(tool="spark")
+
+# %% [markdown]
 # A small "data lake" for Spark: DuckDB exports the raw tables to Parquet, with `orders` in daily folders
 # (`order_date=2026-09-23/`), as a nightly ingestion job would land them.
 

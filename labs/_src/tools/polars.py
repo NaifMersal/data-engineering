@@ -1,7 +1,7 @@
 # %% [markdown]
 # # Polars, one idea at a time
 #
-# Before Day 1 · self-paced · about 90 min. Labs 1.2, 2.1, 2.4, 3.1 and the capstone use **Polars**, a fast DataFrame
+# Before Day 1 · self-paced · about 90 min. Labs 2.1, 2.4, 3.1 and the capstone use **Polars**, a fast DataFrame
 # library, and Lab 2.1 expects you to chain a filter, a join, a parse and an aggregation in one go. This lab builds that
 # up one idea at a time, on Qafila's own data: first a 12-row table you can check by eye, then the 45,766 orders.
 #
@@ -57,6 +57,14 @@ import polars as pl
 pl.Config.set_tbl_rows(8)                                  # print at most 8 rows of a table
 app = sqlite3.connect(U.RAW / "qafila_oltp.sqlite")       # Qafila's app database (SQLite)
 print("polars", pl.__version__)
+
+# %% [markdown]
+# You are here: Polars **transforms** (cleaning bronze into silver, Lab 2.1) and **tests** (checks on DataFrames,
+# Lab 2.4). It does in Python, with a DataFrame API, what DuckDB does with SQL.
+
+# %%
+import de_viz as V
+V.platform_map(tool="polars")
 
 # %% [markdown]
 # ## 1 · A DataFrame is a table of typed columns (10')
@@ -558,11 +566,38 @@ print(query.explain())
 #   the file is read, never stored in memory.
 #
 # You wrote the steps in the order that was clear to you; the optimizer reordered them for speed. On the 35 MB of this
-# course the difference is small. On files of many gigabytes, or Parquet files where unused columns are never even read
-# from disk (Lab 1.2), it's the difference between seconds and out-of-memory. Now run it:
+# course the difference is small. On files of many gigabytes it's the difference between seconds and out-of-memory.
+# Now run it:
 
 # %%
 query.collect()
+
+# %% [markdown]
+# On **Parquet** the same two pushdowns go further. A JSON line must still be read and split to find its 3 fields;
+# Parquet stores each column apart, so the other 7 are never read from disk. And Parquet keeps min/max statistics per
+# block of rows (a row group), so the filter can skip whole blocks without reading them (Lab 1.2 measures this).
+#
+# 🤔 **Predict** · We save the feed as Parquet and run the same query on it with `pl.scan_parquet`. What changes in
+# the plan?
+
+# %%
+events_parquet = U.lab_dir("tools_polars") / "delivery_events.parquet"
+events.collect().write_parquet(events_parquet)
+query_parquet = (
+    pl.scan_parquet(os.path.relpath(events_parquet))
+      .filter(pl.col("event_type") == "delivered")
+      .select("city", "courier_id")
+      .group_by("city")
+      .agg(pl.col("courier_id").n_unique().alias("couriers"))
+      .sort("city")
+)
+print(query_parquet.explain())
+U.check(query_parquet.collect().equals(query.collect()), "same answer from the Parquet copy")
+
+# %% [markdown]
+# 🔍 Only the scan line changed (`Parquet SCAN`); the plan is the same: projection and selection are pushed into the
+# scan whatever the format. What differs is what the scan can then **avoid reading**. DuckDB does the same for SQL
+# (`EXPLAIN` in `tools/duckdb` §8): two engines, one idea.
 
 # %% [markdown]
 # A DataFrame you already have becomes lazy with `.lazy()`, and a lazy query becomes a DataFrame with `.collect()`. A

@@ -24,7 +24,11 @@ New to Polars? Work through `tools/polars.ipynb` before Day 1 too (self-paced, a
 
 New to dbt? Before Lab 2.3, work through [`tools/dbt.ipynb`](tools/dbt.ipynb) (guided, about 100 minutes). Start with an empty project folder and a few teaching rows, write the configuration and models yourself, and read the SQL dbt generates from them. Step-by-step players replay each dbt run on the project's graph and an incremental `delete+insert` row by row, then compare it with `merge`; you break an incremental model on purpose and watch a failing test skip the report. Five short exercises along the way, and a tested city sales report at the end. This is an extended walkthrough outside the regular 25-minute session lab.
 
+Session 1.1 is taught from [`tools/duckdb.ipynb`](tools/duckdb.ipynb), with no slides: one business question asked of the app database (SQLite) and of pandas, then of DuckDB, a fraction of the time and a file several times smaller. Then the engine itself: in-process, columnar, vectorized; connections and database files; CSV sniffing, globs with `union_by_name`, nested JSON, Parquet; tables vs. views; attaching SQLite; the one-writer lock, broken on purpose; DataFrames and relations in Python; friendly SQL; reading `EXPLAIN ANALYZE`. Three short exercises. Lab 1.1 then points it at the real sources.
+
 Session 1.3 is taught from [`tools/dlt.ipynb`](tools/dlt.ipynb), with no slides: a loader written by hand breaks in four ways (retries, refunds, a new field, the cursor), then dlt does the same job while you read the files and tables it produces. Write dispositions, an incremental cursor whose state survives deleting the pipeline folder, a late record that slips past the cursor, nested data, variant columns and schema contracts; three short exercises. Lab 1.3 then applies it to the real payments API and app database.
+
+Session 2.4 starts from [`tools/pandera.ipynb`](tools/pandera.ipynb): a day of payments with six problems, checked first with hand-written asserts (one failure per run, nulls slip through), then with a Pandera schema: types and nulls, built-in and custom checks, every failure at once with its row, a quarantine split, and the LazyFrame trap broken on purpose. It ends by mapping each rule to its dbt test and running the schema on the real payments feed. Three short exercises; Lab 2.4 then validates the supplier price files.
 
 **Lab 3.2 (Spark)** needs Java 17+. On Colab the lab installs it. Locally, install a JDK (for example [Temurin 21](https://adoptium.net/)), set `JAVA_HOME`, then `uv sync --extra spark`. On native Windows, Spark also needs `winutils.exe` to write files, so Windows users should run Lab 3.2 on Colab (or in WSL).
 
@@ -37,6 +41,7 @@ Set `DE_QUICK=1` to shrink the heavier workloads. Useful on slow laptops and for
 | 0 | Setup | [`00_setup_check.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_setup_check.ipynb) | CPU |
 | 0 | Prerequisite: SQL window functions (self-paced) | [`00_sql_windows.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_sql_windows.ipynb) | CPU |
 | 0 | Prerequisite: Polars, one idea at a time (self-paced) | [`tools/polars.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/polars.ipynb) | CPU |
+| 1 | Walkthrough: DuckDB, an analytical database in a library (taught before Lab 1.1) | [`tools/duckdb.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/duckdb.ipynb) | CPU |
 | 1 | Platform tour | [`D1_1_platform_tour.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_1_platform_tour.ipynb) | CPU |
 | 1 | Files & columnar storage | [`D1_2_files_parquet.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_2_files_parquet.ipynb) | CPU |
 | 1 | Walkthrough: dlt, from a hand-written loader to an incremental pipeline (taught before Lab 1.3) | [`tools/dlt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dlt.ipynb) | CPU |
@@ -46,6 +51,7 @@ Set `DE_QUICK=1` to shrink the heavier workloads. Useful on slow laptops and for
 | 2 | Dimensional modeling | [`D2_2_dimensional_modeling.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_2_dimensional_modeling.ipynb) | CPU |
 | 2 | Guided preparation: dbt from an empty folder (about 100 min) | [`tools/dbt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dbt.ipynb) | CPU |
 | 2 | dbt project | [`D2_3_dbt_project.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_3_dbt_project.ipynb) | CPU |
+| 2 | Walkthrough: Pandera, checks at the door (taught before Lab 2.4) | [`tools/pandera.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/pandera.ipynb) | CPU |
 | 2 | Testing & data quality | [`D2_4_data_quality.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_4_data_quality.ipynb) | CPU |
 | 3 | Iceberg lakehouse | [`D3_1_iceberg_lakehouse.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_1_iceberg_lakehouse.ipynb) | CPU |
 | 3 | Spark | [`D3_2_spark.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_2_spark.ipynb) | **Colab** (or Java 17+) |
@@ -62,6 +68,8 @@ Exercises are marked **✏️ Exercise** and raise `NotImplementedError` until y
 
 Labs don't depend on each other: from Day 2 on, each lab starts from `U.build_warehouse()`, the end state of the Day 1 ingestion labs (`warehouse/qafila.duckdb`, schema `raw`). Each lab writes its own outputs to `artifacts/<lab>/`.
 
+The DuckDB walkthrough is self-contained (`artifacts/tools_duckdb/`): it builds its own 1M-row app database and toy files.
+The Pandera walkthrough is self-contained (`artifacts/tools_pandera/`), apart from reading the payments feed in its last section.
 The dlt walkthrough is self-contained too (`artifacts/tools_dlt/`), apart from one look at the local payments API.
 The guided dbt walkthrough is self-contained: it creates its own tiny teaching database and project in `artifacts/tools_dbt/`, without using the shared warehouse. Rerunning its workspace setup cell resets only that walkthrough's generated files. Its student notebook has five exercises; the reference notebook in `solutions/tools/` includes their answers.
 
