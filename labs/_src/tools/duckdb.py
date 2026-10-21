@@ -43,7 +43,7 @@ if IN_COLAB:
     if not Path("/content/data-engineering").exists():
         subprocess.run(["git", "clone", "-q", REPO_URL, "/content/data-engineering"], check=True)
     os.chdir("/content/data-engineering/labs")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "duckdb>=1.4", "polars>=1.30"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "duckdb>=1.4,<2", "polars>=1.30"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
         os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/

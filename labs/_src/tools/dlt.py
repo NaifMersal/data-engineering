@@ -43,7 +43,7 @@ if IN_COLAB:
     if not Path("/content/data-engineering").exists():
         subprocess.run(["git", "clone", "-q", REPO_URL, "/content/data-engineering"], check=True)
     os.chdir("/content/data-engineering/labs")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "duckdb>=1.4", "dlt[duckdb]>=1.30"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "duckdb>=1.4,<2", "dlt[duckdb]>=1.30"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
         os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/
@@ -515,8 +515,8 @@ for week in [PRICES_W37, PRICES_W38]:
 sql("SELECT sku, unit_cost, unit_cost__v_text, _dlt_load_id FROM raw.prices")
 
 # %% [markdown]
-# 🔍 dlt didn't fail and didn't guess: the text landed in a **variant column**, `unit_cost__v_text`. The raw layer has
-# everything the supplier sent, but a report on `unit_cost` now silently misses week 38. Lab 1.3's stretch meets this
+# 🔍 dlt didn't fail and didn't guess: the text landed in a **variant column**, `unit_cost__v_text`. The bronze zone
+# (`raw`) has everything the supplier sent, but a report on `unit_cost` now silently misses week 38. Lab 1.3's stretch meets this
 # in the real supplier files.
 #
 # Tolerant is the right default for bronze. When a table must not change without someone deciding it, declare a
@@ -612,6 +612,29 @@ V.platform_map(tool="dlt")
 # | **It doesn't** | see rows deleted at the source (CDC, Lab 1.4) · clean or model data (Polars, dbt: Day 2) · decide when to run (Dagster, Lab 4.1) |
 # | **Managed equivalents** | Fivetran, Airbyte, AWS Glue, Azure Data Factory: the same jobs as a service, with ready-made connectors |
 # | **Streams** | Kafka Connect, Debezium: the same idea for events that never stop (Day 3) |
+#
+# **Before you write a loader**, talk to the source's owner: what changes, how often, how deletes show up, what the
+# keys are, and who to call when it breaks. That conversation is the first draft of a data contract (Day 4). Each kind
+# of source fails in its own ways:
+#
+# | Source | What goes wrong |
+# |---|---|
+# | databases | load on production, long-running queries, deletes you can't see, time zones in timestamps |
+# | APIs | paging, rate limits, tokens that expire, fields that appear or disappear |
+# | files | late or partial uploads, encodings, delimiters, renamed columns, files sent twice |
+# | events | duplicates, late and out-of-order arrival, a schema per producer version (Day 3) |
+#
+# **When the schema changes**, the response depends on the kind of change:
+#
+# | Change | Kind | Typical response |
+# |---|---|---|
+# | a new column (`wallet_provider`) | additive | add it, nullable (dlt's default, §7) |
+# | a wider type (int → bigint) | compatible | widen it |
+# | a renamed column, a narrower type, a new meaning | breaking | stop, alert, map or version explicitly (a contract, §7) |
+# | a removed column | breaking | keep the column, fill nulls, alert |
+#
+# Bronze **tolerates**: land new fields so nothing is lost. Silver **enforces**: typed models fail loudly instead of
+# quietly producing nulls (Day 2).
 #
 # **Cheat sheet**
 #

@@ -1,6 +1,6 @@
 # Colab already ships pandas, numpy, matplotlib, requests and pyyaml.
 # DuckDB, Polars and PyArrow are preinstalled too, but the labs need newer versions.
-duckdb>=1.4
+duckdb>=1.4,<2  # 2.0 removed fetchone() on relations, which the labs use
 polars>=1.30
 pyarrow>=18
 dlt[duckdb]>=1.30

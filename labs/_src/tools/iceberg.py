@@ -1,18 +1,17 @@
 # %% [markdown]
 # # Iceberg · open table formats, on a lightboard
 #
-# Day 3 · Session 1 · instructor walkthrough, about 25 minutes. **No exercises:** we run every cell together and talk
-# about what comes out. You practise in **Lab 3.1** right after.
+# Day 3, before Lab 3.1 · CPU only. A folder of Parquet files breaks as soon as a load dies halfway or one row must
+# change. You watch it break, then build an Iceberg table commit by commit and replay what each commit wrote on disk.
 #
-# We use Qafila's **payments** feed here; the lab uses **orders**. Same ideas, different table.
+# **The data:** Qafila's **payments** feed; Lab 3.1 then builds the **orders** table. Same ideas, different table.
 #
-# Every section follows the same rhythm:
+# **Rhythm:** 🤔 predict → run → 🔍 read. After the code, a **board** (a step-by-step player) replays what just happened
+# on disk, one piece at a time, the way you would draw it on a lightboard: click **Next ▶** or **▶ Play**. Except for
+# the history board, everything on a board is read from the table's own metadata files.
 #
-# 1. **The question** (🤔): ask the room **before** running the cell.
-# 2. **The code**: real PyIceberg on real files.
-# 3. **The board**: a step-by-step player that replays what just happened on disk, one piece at a time, the way you
-#    would draw it on a lightboard. Click **Next ▶** (or **▶ Play**) and talk over each step. Except for the history
-#    board, everything on a board is read from the table's own metadata files.
+# **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
+# then run the cell and the check after it (✅ = right). Answers: `solutions/tools/iceberg.ipynb`.
 #
 # | | Section | The one idea |
 # |---|---|---|
@@ -29,8 +28,18 @@
 # | 7 | Two writers | optimistic concurrency: one compare-and-swap; conflicting rewrites fail |
 # | 8 | Rename a column | columns are tracked by id |
 # | 9 | Another engine | DuckDB follows the same pointers |
+# | 10 | Back to the map | the formats, the catalogs, and what Lab 3.1 adds |
 #
 # The boards are HTML players: run the notebook in Jupyter, VS Code or Colab (GitHub's preview won't show them).
+
+# %% [markdown] 🎓
+# 🎓 **Instructor notes** (solution notebook only)
+#
+# - Walked as a lightboard: ask each 🤔 **before** running the cell, then step through the board with **Next ▶** and
+#   talk over each step. About 25' in class without the exercises; the three ✏️ are for the students' own pace.
+# - Stop at ① on the commit board (§3) and ask "if the job died right here, what would a reader see?".
+# - Lab 3.1 creates the partitioned table, upserts refunds, erases a customer, time-travels per snapshot, evolves the
+#   schema **and the partitioning**, and reads from DuckDB and Polars: don't do those here.
 
 # %%
 import os, sys, subprocess
@@ -347,6 +356,26 @@ V.iceberg_read(tbl, evening)
 # the real column and Iceberg maps it to partitions. The board's decisions are PyIceberg's own evaluators, the same
 # ones `plan_files()` used.
 #
+# ✏️ **Exercise 1** · Write `two_days`, a row filter for the payments of **5 and 6 August** (UTC), on `created_at`.
+# - **Result:** `two_days`, a string like `evening` above.
+# - **Check yourself:** the scan plans exactly 2 of the 8 files, and returns every payment of those two days.
+
+# %%
+# Template:
+# two_days = "created_at >= '___' and created_at < '___'"
+# BEGIN SOLUTION
+two_days = "created_at >= '2026-08-05T00:00:00' and created_at < '2026-08-07T00:00:00'"
+# END SOLUTION
+planned_two = sorted(t.file.file_path.split("/")[-2] for t in tbl.scan(row_filter=two_days).plan_files())
+planned_two
+
+# %%
+U.check(planned_two == ["created_day=2026-08-05", "created_day=2026-08-06"], "2 files planned: 5 and 6 August")
+U.check(tbl.scan(row_filter=two_days).to_arrow().num_rows == day(5).num_rows + day(6).num_rows,
+        "every payment of the two days, and nothing else")
+
+# %% [markdown]
+#
 # # Part C · What the layers buy you
 #
 # ## 5 · A one-row delete: copy-on-write
@@ -394,6 +423,30 @@ V.iceberg_history(tbl, notes)
 # %% [markdown]
 # Useful for debugging ("what did the table say when the dashboard broke?") and for reproducible training sets. Bad news
 # for the **right to erasure**: deleted rows live on in old snapshots until you expire them (Lab 3.1 ✱, Lab 4.3).
+#
+# ✏️ **Exercise 2** · Section 5 said that which row a delete removed is recorded nowhere: you find it by comparing two
+# snapshots. Do it. `tbl.snapshots()` lists them oldest first: the first append (S1), the second (S2), then the delete.
+# - **Result:** `gone`, the set of `payment_id`s in S2 that are not in the current snapshot.
+# - **Check yourself:** one payment, the test payment of 3 August.
+
+# %%
+# Template:
+# s2 = tbl.snapshots()[___].snapshot_id
+# ids_then = set(tbl.scan(snapshot_id=___).to_arrow()["payment_id"].to_pylist())
+# ids_now = set(tbl.scan().to_arrow()["payment_id"].to_pylist())
+# gone = ___
+# BEGIN SOLUTION
+s2 = tbl.snapshots()[1].snapshot_id
+ids_then = set(tbl.scan(snapshot_id=s2).to_arrow()["payment_id"].to_pylist())
+ids_now = set(tbl.scan().to_arrow()["payment_id"].to_pylist())
+gone = ids_then - ids_now
+# END SOLUTION
+gone
+
+# %%
+U.check(gone == {victim}, "the only payment that left between S2 and now is the test payment")
+
+# %% [markdown]
 #
 # ## 7 · Two writers at once: optimistic concurrency
 #
@@ -528,7 +581,68 @@ V.iceberg_engines(tbl.metadata_location, [("PyIceberg", "wrote every commit", "c
 # One copy of the data, many engines, one answer to "what's in the table right now". In production a Spark job writes,
 # DuckDB or Trino answers ad-hoc questions, and Snowflake reads through a catalog integration.
 #
-# ## Recap → Lab 3.1
+# ✏️ **Exercise 3** · Every metadata file is a whole version of the table. `v_s2` (section 5) is the metadata file from
+# just **before** the delete. Count the payments of 3 August in that version, with DuckDB.
+# - **Result:** `aug3_then`, a number.
+# - **Check yourself:** all of 3 August's payments, test payment included; the current version has fewer (sections 5
+#   and 7 deleted some).
+
+# %%
+# Template:
+# aug3_then = con.sql(f"""
+#     SELECT count(*) FROM iceberg_scan('{___}') WHERE created_at::DATE = DATE '2026-08-03'
+# """).fetchone()[0]
+# BEGIN SOLUTION
+aug3_then = con.sql(f"""
+    SELECT count(*) FROM iceberg_scan('{v_s2}') WHERE created_at::DATE = DATE '2026-08-03'
+""").fetchone()[0]
+# END SOLUTION
+aug3_then
+
+# %%
+aug3_now = con.sql(f"""
+    SELECT count(*) FROM iceberg_scan('{tbl.metadata_location}') WHERE created_at::DATE = DATE '2026-08-03'
+""").fetchone()[0]
+U.check(aug3_then == day(3).num_rows, "the old version still has every payment of 3 August")
+U.check(aug3_now < aug3_then, f"the current version has {aug3_then - aug3_now} fewer: the deletes of sections 5 and 7")
+
+# %% [markdown]
+# ## 10 · Back to the map
+#
+# Iceberg **stores**: it turns files on object storage into tables that any engine can read and change safely, in any
+# zone (bronze, silver or gold).
+
+# %%
+V.platform_map(tool="iceberg")
+
+# %% [markdown]
+# | | |
+# |---|---|
+# | **It does** | atomic commits on files (one pointer swap) · snapshots and time travel · row-level deletes and upserts · schema and partition evolution without rewriting data · file skipping from metadata · many engines on one copy |
+# | **It doesn't** | run queries (engines do: DuckDB, Spark, Trino, Snowflake...) · compact files or expire snapshots by itself (maintenance jobs do, Lab 3.1 ✱) · decide who may read what (the catalog does, Day 4) |
+# | **In this course** | Lab 3.1 builds `qafila.orders` · Lab 3.4 commits a stream into Iceberg · Lab 4.3 erases a customer for good |
+# | **Managed equivalents** | AWS S3 Tables / Glue, Databricks Unity Catalog, Snowflake (managed Iceberg tables), BigQuery BigLake tables: the same format, with the catalog and maintenance run for you |
+#
+# **Four open table formats.** The same idea, a metadata layer over Parquet files; they differ in where that metadata
+# lives.
+#
+# | Format | From | Metadata lives in | Known for |
+# |---|---|---|---|
+# | Apache Iceberg | Netflix → Apache | JSON + Avro files, and a catalog | the broadest engine support; the usual "many engines, one copy" choice |
+# | Delta Lake | Databricks → Linux Foundation | a numbered log, `_delta_log/*.json` + checkpoints | Databricks' default; UniForm exposes Delta tables as Iceberg |
+# | Apache Hudi | Uber → Apache | a timeline of files | record-level upserts and incremental pulls |
+# | DuckLake | DuckDB Labs | a SQL database (PostgreSQL, SQLite, DuckDB) | Parquet data with the catalog and metadata in SQL: simple, fast commits |
+#
+# Which one? Follow your engines and your catalog. Iceberg v3 (2025) shares deletion vectors with Delta and adds a
+# `VARIANT` type for semi-structured JSON: the formats are converging.
+#
+# **The catalog is the control plane.** Every engine must agree on one thing: which metadata file is current. The
+# **Iceberg REST catalog** spec lets any engine talk to any catalog over HTTP, and catalogs now also hand out short-lived
+# storage credentials and enforce access control, so governance moves there (Day 4). Open source: Apache Polaris,
+# Unity Catalog OSS, Lakekeeper, Nessie, Apache Gravitino. In the cloud: AWS Glue / S3 Tables, Databricks Unity
+# Catalog, Snowflake Open Catalog, BigLake. Here: PyIceberg's `SqlCatalog` on SQLite, with a local folder playing S3.
+#
+# **Recap**
 #
 # | We saw | Because |
 # |---|---|
@@ -544,5 +658,14 @@ V.iceberg_engines(tbl.metadata_location, [("PyIceberg", "wrote every commit", "c
 # | two deletes in one file: B failed | on retry, rewrites are checked against the commits they missed |
 # | a rename rewrote nothing | columns are tracked by id |
 #
-# **Lab 3.1** does the same on `qafila.orders`: build the table, upsert refunds, erase a customer, evolve the schema
-# **and the partitioning**, and read it from DuckDB and Polars.
+# ## Checkpoint
+#
+# 1. A load dies halfway. What does a reader see with a folder of Parquet files, and with an Iceberg table? Why?
+# 2. Name the layers from the catalog down to the data files, and the one question each answers.
+# 3. Spark and DuckDB write to the same Iceberg table at the same moment. What happens to each writer?
+# 4. A one-row delete rewrote a whole file. What would merge-on-read have written instead, and what does it cost readers?
+# 5. A customer is deleted from the table. Is their data gone from storage? What else must happen?
+#
+# **Next: [Lab 3.1 · An Iceberg lakehouse](../D3_1_iceberg_lakehouse.ipynb)** does the same on `qafila.orders`: build
+# the table, upsert refunds, erase a customer, evolve the schema **and the partitioning**, and read it from DuckDB and
+# Polars.

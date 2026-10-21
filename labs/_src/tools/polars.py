@@ -1,34 +1,46 @@
 # %% [markdown]
 # # Polars, one idea at a time
 #
-# Before Day 1 · self-paced · about 90 min. Labs 2.1, 2.4, 3.1 and the capstone use **Polars**, a fast DataFrame
-# library, and Lab 2.1 expects you to chain a filter, a join, a parse and an aggregation in one go. This lab builds that
-# up one idea at a time, on Qafila's own data: first a 12-row table you can check by eye, then the 45,766 orders.
+# Day 2, before Lab 2.1 · CPU only. Lab 2.1 cleans bronze into silver with **Polars**, a fast DataFrame library, and
+# expects you to chain a filter, a join, a parse and an aggregation in one go. Labs 2.4, 3.1 and the capstone use it
+# too. You first answer one question with a hand-written Python loop and watch it slow down, then build Polars up one
+# idea at a time.
 #
-# Every section follows the same rhythm: **🤔 predict** what a cell returns, run it, then read the explanation.
-# Write your prediction down before you run the cell: that's where the learning happens.
+# **The data:** Qafila's own, from the start: a 12-row stores table you can check by eye, then the 45,766 orders of the
+# app database and the courier feed. Lab 2.1 then cleans the messy parts (timestamps, duplicates, customers).
 #
-# **How the exercises work.** Each ✏️ exercise asks for **one** result and tells you what a correct one looks like.
-# Its code cell starts with a template in comments:
-# 1. select the template lines and uncomment them (`Ctrl+/`, or `Cmd+/` on a Mac);
-# 2. replace every `___` with the right column, method or value;
-# 3. delete the two lines below the template (`# ✏️ YOUR CODE HERE` and `raise NotImplementedError(...)`);
-# 4. run the cell, then the check cell after it: each ✅ means that part is right.
+# **Rhythm:** 🤔 predict → run → 🔍 read. Write your prediction down before you run the cell.
 #
-# **Tasks**
-# - [ ] 1 · A DataFrame is a table of typed columns (10')
-# - [ ] 2 · Expressions and `select` (10')
-# - [ ] 3 · `filter`: keep the rows you want (10')
-# - [ ] 4 · `with_columns`: add and fix columns (15')
-# - [ ] 5 · `group_by` + `agg`: one row per group (10')
-# - [ ] 6 · Joins: combine tables (10')
-# - [ ] 7 · `over`: group answers without collapsing rows (5')
-# - [ ] 8 · Lazy mode: describe the query, let Polars plan it (10')
-# - [ ] 9 · Put it together: one question, one chain (10')
+# **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
+# then run the cell and the check after it (✅ = right). Answers: `solutions/tools/polars.ipynb`.
+#
+# **Contents**
+# - [ ] 1 · The problem: a question answered by a loop
+# - [ ] 2 · The mental model: you write the rules, the engine runs them
+# - [ ] 3 · Hello world: a DataFrame is a table of typed columns
+# - [ ] 4 · Expressions and `select`
+# - [ ] 5 · `filter`: keep the rows you want
+# - [ ] 6 · `with_columns`: add and fix columns
+# - [ ] 7 · `group_by` + `agg`: one row per group
+# - [ ] 8 · Joins: combine tables
+# - [ ] 9 · `over`: group answers without collapsing rows
+# - [ ] 10 · Lazy mode: describe the query, let Polars plan it
+# - [ ] 11 · Put it together: one question, one chain
+# - [ ] 12 · Back to the map
 #
 # Know pandas? Polars looks similar but thinks differently: there is no index, nothing is changed in place (every
 # method returns a new DataFrame), and you describe columns with **expressions** instead of indexing with `df[...]`.
-# Task 2 is the one to read slowly.
+# §4 is the one to read slowly.
+
+# %% [markdown] 🎓
+# 🎓 **Instructor notes** (solution notebook only)
+#
+# - Walked in class so far in 30–50'. §1–2 set the frame (5'); §4 (expressions and contexts) is the one to slow down
+#   on; §9 and the exercises can be left for the students' own pace if time is short.
+# - §1 reads the courier feed 40 times (≈900k events): the loop takes several seconds, Polars well under one. The
+#   ratio is the point, not the numbers; quick mode reads it 10 times.
+# - Lab 2.1 parses three timestamp formats, picks one copy per `event_id` and cleans customers: don't teach those here.
+#   §6's time zones and §10's plans are what it builds on.
 
 # %%
 import os, sys, subprocess
@@ -67,7 +79,90 @@ import de_viz as V
 V.platform_map(tool="polars")
 
 # %% [markdown]
-# ## 1 · A DataFrame is a table of typed columns (10')
+# ## 1 · The problem: a question answered by a loop
+#
+# The operations team asks: **how many couriers delivered at least one order in each city?** The answer is in the
+# courier feed, one JSON object per line. Plain Python can answer it with a loop. To see how the loop grows with the
+# data, it reads the feed 40 times, as if it held 40 times more events.
+
+# %%
+import json
+from collections import defaultdict
+
+FEED = U.RAW / "events" / "delivery_events.jsonl"
+COPIES = U.pick(40, 10)                      # read the feed this many times (fewer in quick mode)
+times = {}
+
+with U.timer("a Python loop", times):
+    couriers = defaultdict(set)               # city → the couriers seen delivering there
+    events_read = 0
+    for _ in range(COPIES):
+        with open(FEED, encoding="utf-8") as f:
+            for line in f:
+                event = json.loads(line)      # parse all 10 fields of every event...
+                events_read += 1
+                if event["event_type"] == "delivered":   # ...to keep 2 of them, from 1 event in 4
+                    couriers[event["city"]].add(event["courier_id"])
+
+by_loop = {city: len(ids) for city, ids in sorted(couriers.items())}
+print(f"{events_read:,} events read →", by_loop)
+
+# %% [markdown]
+# 🤔 **Predict** · The same question in Polars, on the same 40 copies. How much faster: twice, ten times?
+
+# %%
+with U.timer("Polars", times):
+    by_polars = (
+        pl.scan_ndjson([FEED] * COPIES)
+          .filter(pl.col("event_type") == "delivered")
+          .group_by("city")
+          .agg(pl.col("courier_id").n_unique().alias("couriers"))
+          .sort("city")
+          .collect()
+    )
+print(by_polars.rows())
+U.check(dict(by_polars.rows()) == by_loop, "the same answer as the loop")
+print(f"Polars was {times['a Python loop'] / times['Polars']:.0f}× faster")
+
+# %% [markdown]
+# 🔍 The loop is correct, and on one copy of the feed it takes a fraction of a second. But it grows with the data on
+# one core, and **how** it runs is welded to **what** it computes: the rule ("delivered, distinct couriers, per city")
+# is spread over a `for`, an `if`, a `dict` and a `set`. Every job the loop does by hand, Polars does for you:
+#
+# | Job | The loop | Polars (§) |
+# |---|---|---|
+# | Know what each value is | strings and numbers as `json.loads` returns them | typed columns (§3, §6) |
+# | Say what to compute | a `for`, an `if`, a dict of sets | expressions in a context (§4, §5, §7) |
+# | Combine sources | look-up dicts you build yourself | `join` (§8) |
+# | Group answers next to each row | a second loop | `over` (§9) |
+# | Read only what the question needs | parses all 10 fields of every line | projection pushdown (§10) |
+# | Drop rows early | wherever you put the `if` | predicate pushdown (§10) |
+# | Use every core | one core | parallel by default (§2) |
+# | Change the question | rewrite the loop | change one expression (§11) |
+#
+# ## 2 · The mental model: you write the rules, the engine runs them
+#
+# ```
+#  a DataFrame (eager)        expressions          a plan             execution
+#  or a LazyFrame (lazy)  →   in a context    →    optimized     →    on columns, in batches,  →  a DataFrame
+#  typed columns              select, filter, …    (pushdowns)        on every core
+#  └──────────────── you write this ────────────────┘  └───────────── Polars does this ─────────────┘
+# ```
+#
+# | You declare | Polars does |
+# |---|---|
+# | the columns you use (`pl.col("city")`) | reads only those columns (**columnar reading**) |
+# | a filter (`pl.col("event_type") == "delivered"`) | applies it as early as it can, inside the scan if possible (**predicate pushdown**) |
+# | an operation on a column (`n_unique`, `*`, `.str.to_datetime`) | runs it on many values at once, not row by row (**vectorized**) |
+# | several independent expressions, or groups | runs them on all CPU cores (**parallel**) |
+# | the whole query, lazily | plans it before reading anything, and shows you the plan (`.explain()`) |
+#
+# This is the same split as SQL in a database: you say **what**, the engine decides **how**. DuckDB (Day 1) gives
+# you that split with SQL, Polars with Python expressions; under the hood they share the same ideas, and Lab 2.1 runs
+# the same question in both. What neither engine decides for you is the **meaning**: which timestamp is the real
+# one, which copy of a duplicate survives, what counts as revenue. Those rules are yours to write.
+#
+# ## 3 · Hello world: a DataFrame is a table of typed columns
 #
 # Qafila has 12 dark stores. `pl.read_database` runs a SQL query against a database connection and returns the result
 # as a Polars **DataFrame**.
@@ -90,7 +185,7 @@ stores.schema
 # 🤔 **Predict** · `opened_at` holds dates like `2024-01-01`. What is its type: a date or text?
 #
 # It's `str`. SQLite has no date type, so the app stores dates as text, and Polars reads what it is given. Most raw
-# data arrives like this; turning text into real types is a big part of cleaning it (Task 4).
+# data arrives like this; turning text into real types is a big part of cleaning it (§6).
 #
 # One column on its own is a **Series**: a name, a type and the values. Take one out with `df["name"]`. A Series has
 # the methods you'd expect: `min`, `max`, `mean`, `n_unique`, `unique`, `to_list`...
@@ -142,7 +237,7 @@ print(f"reviews {reviews.shape}  payments {payments.shape}")
 payments.head(3)
 
 # %% [markdown]
-# ## 2 · Expressions and `select` (10')
+# ## 4 · Expressions and `select`
 #
 # This is the one idea the rest of Polars is built on. `pl.col("delivery_fee")` does **not** fetch a column. It is an
 # **expression**: a recipe that says "take the column called `delivery_fee`". You can extend a recipe with operators
@@ -154,7 +249,7 @@ print(fee_with_vat)
 
 # %% [markdown]
 # An expression is computed only when you hand it to a DataFrame method that runs it, a **context**. There are four,
-# one per task of this lab:
+# one per section below:
 #
 # | context | what it does with your expressions | rows out |
 # |---|---|---|
@@ -164,7 +259,7 @@ print(fee_with_vat)
 # | `df.group_by(...).agg(...)` | computes them once per group | one per group |
 #
 # Because the recipe is separate from the data, the same expression works on any DataFrame that has those columns, and
-# Polars can look at all your recipes before running them, to run them in parallel or skip work (Task 8).
+# Polars can look at all your recipes before running them, to run them in parallel or skip work (§10).
 #
 # `select` with column names picks columns. With expressions, it computes new ones.
 
@@ -230,7 +325,7 @@ U.check(lines.height == items.height, "one row per order line: nothing aggregate
 U.check(lines["line_total"][0] == 98.4, "order 5000001, line 1: 2 × 49.20 = 98.4 SAR")
 
 # %% [markdown]
-# ## 3 · `filter`: keep the rows you want (10')
+# ## 5 · `filter`: keep the rows you want
 #
 # `filter` takes an expression that gives `true` or `false` per row (a **predicate**) and keeps the `true` rows.
 
@@ -285,7 +380,7 @@ U.check(bad_lines.columns == items.columns, "all the columns of items, just fewe
 # 🔍 Finding bad rows is easy; deciding what to do with them (drop, fix, quarantine, ask the source team) is a data
 # engineering decision. Lab 2.4 builds a quarantine for exactly this.
 #
-# ## 4 · `with_columns`: add and fix columns (15')
+# ## 6 · `with_columns`: add and fix columns
 #
 # `select` keeps only what you list. `with_columns` keeps **every** column and adds yours; an expression whose output
 # name already exists **replaces** that column. That makes it the tool for fixing types.
@@ -376,7 +471,7 @@ weekend_days = orders_t.filter(pl.col("is_weekend"))["created_at"].dt.strftime("
 U.check(weekend_days == ["Friday", "Saturday"], "weekend = Friday and Saturday")
 
 # %% [markdown]
-# ## 5 · `group_by` + `agg`: one row per group (10')
+# ## 7 · `group_by` + `agg`: one row per group
 #
 # `group_by(keys).agg(expressions)` splits the rows into groups, one per distinct key, and computes each expression
 # once per group. It's SQL's `GROUP BY`.
@@ -426,7 +521,7 @@ U.check(by_store["cancel_rate"].is_sorted(descending=True), "sorted from the hig
 # 🔍 No store stands out: cancellations are spread evenly, so a cancellation problem would be a platform problem, not a
 # store problem. That's the kind of sentence a `group_by` lets you write.
 #
-# ## 6 · Joins: combine tables (10')
+# ## 8 · Joins: combine tables
 #
 # Orders know their `store_id`; stores know their `city`. `join` matches rows on a key column:
 
@@ -493,11 +588,11 @@ store_revenue = (
 store_revenue
 
 # %% [markdown]
-# ## 7 · `over`: group answers without collapsing rows (5')
+# ## 9 · `over`: group answers without collapsing rows
 #
 # `group_by` gives one row per group. Sometimes you want the group's answer **next to each row** instead: "what share of
 # its city's revenue does this store make?" That's `.over(...)`, Polars' window function: `pl.col("revenue").sum()
-# .over("city")` is SQL's `sum(revenue) OVER (PARTITION BY city)` (Lab 0 · SQL windows, Task 1).
+# .over("city")` is SQL's `sum(revenue) OVER (PARTITION BY city)` (`00_sql_windows`, Task 1).
 #
 # 🤔 **Predict** · How many rows will this return: 3 (one per city) or 12?
 
@@ -529,17 +624,17 @@ U.check(shares.group_by("city").agg(pl.col("share").sum())["share"].round(2).eq(
 U.check(shares.filter(pl.col("store_id") == "RUH-01")["share"].item() > 0.3, "Olaya (RUH-01) is Riyadh's big store")
 
 # %% [markdown]
-# ## 8 · Lazy mode: describe the query, let Polars plan it (10')
+# ## 10 · Lazy mode: describe the query, let Polars plan it
 #
 # So far every method ran at once: that's **eager** mode, best for exploring. Polars also has a **lazy** mode: you
 # describe the whole query, and nothing is read or computed until `.collect()`. In between, Polars **optimizes** the
 # query, the way a database does with SQL.
 #
-# `pl.scan_ndjson` is the lazy twin of `pl.read_ndjson` (there's a `scan_` for CSV, Parquet, Iceberg...). Here is the
-# courier delivery-events feed:
+# `pl.scan_ndjson` is the lazy twin of `pl.read_ndjson` (there's a `scan_` for CSV, Parquet, Iceberg...). §1's Polars
+# query was lazy. Here it is again on one copy of the courier feed, and this time we look at what Polars did with it:
 
 # %%
-events = pl.scan_ndjson(U.RAW / "events" / "delivery_events.jsonl")
+events = pl.scan_ndjson(os.path.relpath(FEED))   # a relative path keeps the plan short
 query = (
     events.filter(pl.col("event_type") == "delivered")
           .select("city", "courier_id")
@@ -575,7 +670,8 @@ query.collect()
 # %% [markdown]
 # On **Parquet** the same two pushdowns go further. A JSON line must still be read and split to find its 3 fields;
 # Parquet stores each column apart, so the other 7 are never read from disk. And Parquet keeps min/max statistics per
-# block of rows (a row group), so the filter can skip whole blocks without reading them (Lab 1.2 measures this).
+# block of rows (a row group), so the filter can skip whole blocks without reading them (Lab 1.2 measured this with
+# DuckDB).
 #
 # 🤔 **Predict** · We save the feed as Parquet and run the same query on it with `pl.scan_parquet`. What changes in
 # the plan?
@@ -601,7 +697,8 @@ U.check(query_parquet.collect().equals(query.collect()), "same answer from the P
 
 # %% [markdown]
 # A DataFrame you already have becomes lazy with `.lazy()`, and a lazy query becomes a DataFrame with `.collect()`. A
-# good habit: **eager to explore** a sample, **lazy for the pipeline** you'll run again and again.
+# good habit: **eager to explore** a sample, **lazy for the pipeline** you'll run again and again. Start from a
+# `scan_` when you can: `pl.read_ndjson(...).lazy()` optimizes what comes after, but the file was already read whole.
 #
 # ✏️ **Exercise 8** · With a lazy query on `events`, count the **delivered** events per city.
 # - **Result:** `delivered_by_city`, a DataFrame (collected), 3 rows, columns `city`, `delivered`, sorted by `city`.
@@ -637,7 +734,7 @@ U.check(delivered_by_city.equals(expected_counts), "same answer as the eager ver
 # Those counts are a little too high, by the way: the courier feed contains **redelivered** copies of some events. Lab
 # 2.1 removes them, with the same lazy chain plus one `unique` step.
 #
-# ## 9 · Put it together: one question, one chain (10')
+# ## 11 · Put it together: one question, one chain
 #
 # *What is the average delivered basket per city, in September?* Everything you need is above: a filter, a join, a
 # derived column, an aggregation. This time the template only gives you the steps.
@@ -711,17 +808,31 @@ U.check((basket_by_city["avg_basket"] - sql_answer["avg_basket"]).abs().max() < 
 # %% [markdown]
 # 🔍 Two details of this question are easy to get wrong, and the check would catch both:
 # - **September in which time zone?** An order placed at 01:30 on 1 September in Riyadh is 22:30 on 31 August in UTC.
-#   Because `created_at` was converted to Riyadh time in Task 4, `.dt.month()` uses the customer's calendar.
+#   Because `created_at` was converted to Riyadh time in §6, `.dt.month()` uses the customer's calendar.
 # - **One row per what?** After the join with `lines` there is one row per line, so `pl.len()` would count lines, not
 #   orders. `n_unique` on `order_id` counts each order once.
 #
-# ## Checkpoint
+# ## 12 · Back to the map
 #
-# 1. What is the difference between `pl.col("fee") * 2` and `orders["fee"] * 2`?
-# 2. Name the four contexts. Which one keeps every column, which one changes the number of rows?
-# 3. Why does `with_columns(a_new_column, something_using_a_new_column)` fail, and what's the fix?
-# 4. Which join finds the rows of one table that have no match in another?
-# 5. What does `.explain()` show that `.collect()` doesn't, and what are projection and predicate pushdown?
+# Polars **transforms** bronze into silver (Lab 2.1) and **tests** DataFrames on the way (Pandera, Lab 2.4), from
+# Python.
+
+# %%
+V.platform_map(tool="polars")
+
+# %% [markdown]
+# | | |
+# |---|---|
+# | **It does** | DataFrame transformations in Python, fast, on every core · lazy queries with a plan you can read · files in place (CSV, JSON lines, Parquet, Iceberg, databases) · larger-than-memory queries with the streaming engine (`.collect(engine="streaming")`, `sink_parquet`) |
+# | **It doesn't** | store tables or run SQL for other users (that's a database: DuckDB, a warehouse) · scale past one machine (Spark, Day 3) · decide your cleaning rules · schedule, ingest or test by itself (Dagster, dlt, Pandera) |
+# | **In this course** | bronze → silver cleaning (Lab 2.1) · Pandera checks on DataFrames (Lab 2.4) · reading an Iceberg table (`pl.scan_iceberg`, Lab 3.1) |
+# | **Managed equivalents** | none as such: Polars runs inside your job. The same DataFrame code at cluster scale is Spark's DataFrame API (Databricks, EMR, Dataproc); Polars Cloud runs Polars queries remotely |
+# | **Neighbours** | DuckDB (the same engine ideas behind SQL; you can pass DataFrames between them) · pandas (smaller data, and the libraries that expect it; watch peak memory) · Spark (distributed, with a cluster's cost) |
+#
+# **Which engine?** It follows the workload, not a gigabyte threshold. Lab 2.1 runs one question in Polars and in
+# DuckDB and gets the same answer; on one machine the choice is mostly about the language your team writes. A
+# larger dataset doesn't by itself need a cluster: measure memory, disk spill and the plan first (Lab 2.1's stretch
+# runs a big join under a 100 MB memory limit).
 #
 # ## Cheat sheet: SQL ↔ Polars
 #
@@ -739,7 +850,16 @@ U.check((basket_by_city["avg_basket"] - sql_answer["avg_basket"]).abs().max() < 
 # | `sum(v) OVER (PARTITION BY k)` | `pl.col("v").sum().over("k")` |
 # | `EXPLAIN` | `lazy_frame.explain()` |
 #
-# **Where you'll meet Polars next:** Lab 1.2 scans Parquet lazily and watches pushdown skip data; Lab 2.1 parses three
-# timestamp formats with `pl.when` and the `.str`/`.dt` namespaces, deduplicates with `unique`, and writes Parquet with
-# `sink_parquet`; Lab 2.4 validates DataFrames with Pandera; Lab 3.1 reads an Iceberg table with `pl.scan_iceberg`.
-# The [Polars user guide](https://docs.pola.rs/user-guide/) goes deeper on every section of this lab.
+# ## Checkpoint
+#
+# 1. The loop in §1 was correct. Why does it get slower, and harder to change, as the data and the questions grow?
+# 2. What is the difference between `pl.col("fee") * 2` and `orders["fee"] * 2`?
+# 3. Name the four contexts. Which one keeps every column, which one changes the number of rows?
+# 4. Why does `with_columns(a_new_column, something_using_a_new_column)` fail, and what's the fix?
+# 5. Which join finds the rows of one table that have no match in another?
+# 6. What does `.explain()` show that `.collect()` doesn't, and what are projection and predicate pushdown?
+#
+# **Next: [Lab 2.1 · Bronze to silver](../D2_1_bronze_to_silver.ipynb).** It parses three timestamp formats with the
+# `.str`/`.dt` namespaces, keeps one copy per event with `unique`, and writes silver Parquet with `sink_parquet`.
+# After it, Lab 2.4 validates DataFrames with Pandera and Lab 3.1 reads an Iceberg table with `pl.scan_iceberg`.
+# The [Polars user guide](https://docs.pola.rs/user-guide/) goes deeper on every section of this walkthrough.

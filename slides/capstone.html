@@ -56,7 +56,7 @@
   <div class="cols cols-2">
     <ol class="bullets small">
       <li>An end-to-end pipeline from <b>two or more source types</b> to analytics-ready tables, <b>one command</b> to run.</li>
-      <li>A <b>layered model</b> (raw → staging → marts) with the <b>grain</b> of every fact table written down.</li>
+      <li>A <b>layered model</b> (bronze <code>raw</code> → silver <code>staging</code> → gold <code>marts</code>) with the <b>grain</b> of every fact table written down.</li>
       <li><b>Incremental</b> loading that's safe to re-run, demonstrated live.</li>
       <li>At least <b>8 tests or contract checks</b>, one catching a <b>real</b> problem.</li>
       <li><b>Orchestration</b> (or a justified alternative) and a <b>governance note</b>: classification and protection of every personal-data column.</li>

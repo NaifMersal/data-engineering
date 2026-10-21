@@ -94,8 +94,9 @@ U.check(n_out_of_order > 1000, "arrival order is not commit order")
 #
 # ## 2 · Latest change per key; MERGE into a current-state table (7')
 #
-# Start from the snapshot. Careful with types: a CSV sniffer would read `0596390578` as the number 596390578 and silently
-# drop the leading zero, so identifiers are read as text.
+# Start from the snapshot. Careful with types: whether a CSV reader keeps the leading zero of `0596390578` depends on
+# the tool and its version (DuckDB 1.5 keeps it as text; pandas reads the number 596390578). Identifiers are text, so
+# say so with `types =` instead of trusting the guess.
 
 # %%
 con.sql(f"""

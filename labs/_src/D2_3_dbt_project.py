@@ -10,6 +10,15 @@
 # (`stg_orders` and `fct_order_items`), and on a copy of the warehouse, so nothing you break affects other labs.
 # dbt runs **in-process** from Python (`U.run_dbt([...])` wraps `dbtRunner`); in a terminal you'd type `dbt build` etc.
 #
+# **Coming from Lab 2.2?** The project builds the same star, with simpler names and keys. Don't copy Lab 2.2's into it:
+#
+# | | Lab 2.2 (the star by hand) | Lab 2.3 (this project) |
+# |---|---|---|
+# | dimensions | `dim_customer`, `dim_product` | `dim_customers`, `dim_products` |
+# | keys in the fact | warehouse keys `customer_key`, `product_key` | source IDs `customer_id`, `product_id` (`-1` = Unknown) |
+# | date | `date_key` | `order_date` |
+# | lines with a quantity ≤ 0 | kept, so the fact reconciles to the source | left out of the fact, kept in `quarantine.qrn_order_items` |
+#
 # **Tasks**
 # - [ ] 1 · Tour the project and list its models (4')
 # - [ ] 2 · Write `stg_orders` and build the staging layer (6')

@@ -52,7 +52,7 @@ if IN_COLAB:
         subprocess.run(["git", "clone", "-q", REPO_URL, "/content/data-engineering"], check=True)
     os.chdir("/content/data-engineering/labs")
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "dagster>=1.10", "dagster-dbt>=0.26",
-                    "dbt-duckdb>=1.11"], check=True)
+                    "duckdb>=1.4,<2", "dbt-duckdb>=1.11"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
         os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/

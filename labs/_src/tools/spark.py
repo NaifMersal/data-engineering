@@ -1,17 +1,20 @@
 # %% [markdown]
 # # Spark, live and visual
 #
-# Day 3 · Session 2 · instructor walkthrough, about 25 minutes. **No exercises:** we run every cell together, watch
-# what Spark does, then read what it tells us. You practise in **Lab 3.2** right after.
+# Day 3, before Lab 3.2 · Colab (or WSL / Linux / macOS with Java 17+). DuckDB and Polars ran every lab so far on one
+# machine. This walkthrough shows what changes when the work is spread over a cluster: how Spark splits it, plans it,
+# moves data between machines, and where that goes wrong.
 #
-# Every section follows the same rhythm:
+# **Rhythm:** each section gives **the idea** in two or three sentences, then **the picture** (a step-by-step player:
+# click **Next ▶** or **▶ Play**), then **the proof**: real Spark code on Qafila's data. Most pictures are drawn from
+# what Spark just returned. 🤔 = predict before you run the cell.
 #
-# 1. **The idea** in two or three sentences.
-# 2. **The picture**: a step-by-step player. Click **Next ▶** (or **▶ Play**) and talk over each step.
-# 3. **The proof**: real Spark code on Qafila's data. Most pictures are drawn from what Spark just returned.
+# **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
+# then run the cell and the check after it (✅ = right). Answers: `solutions/tools/spark.ipynb`.
 #
 # | | Section | The one idea |
 # |---|---|---|
+# | 0 | The problem: do you need a cluster? | scale up first; scale out when you must |
 # | 1 | Why Spark: driver, executors, cores | split the data, send the work to many machines |
 # | 2 | Partitions are tasks | one partition on one core is one task |
 # | 3 | Lazy evaluation | transformations plan, actions run |
@@ -19,11 +22,18 @@
 # | 5 | Joins | broadcast the small side, shuffle the big ones |
 # | 6 | Skew | one key, one huge task |
 # | 7 | Writing | one file per task |
+# | 8 | Back to the map | what Spark is for, and its neighbours |
 #
-# ⚠️ Run this on **Colab** (Spark 4 needs Java 17+; the first Spark cell installs it, about a minute). Start that cell
-# while you introduce the session. Native Windows can't run it; WSL can.
+# ⚠️ Run this on **Colab** (Spark 4 needs Java 17+; on Colab the first Spark cell installs it, about a minute). Native
+# Windows can't run it; WSL can.
+
+# %% [markdown] 🎓
+# 🎓 **Instructor notes** (solution notebook only)
 #
-# 🤔 marks a question to ask the room **before** running the cell.
+# - Start the first Spark cell (§1) while you introduce §0: on Colab it installs Java, about a minute.
+# - Open the Spark UI tab in §1 and keep it on screen; refresh it after each action.
+# - Walked in about 25' without the two exercises. Lab 3.2 does pruning, broadcast timing, salting and the
+#   small-files count: don't do those here.
 
 # %%
 import os, sys, subprocess
@@ -68,6 +78,21 @@ for t in ["order_items", "stores", "products"]:
 print("order folders:", len(list((LAKE / "orders").iterdir())), "| parquet files:", U.count_files(LAKE))
 
 # %% [markdown]
+# ## 0 · The problem: do you need a cluster?
+#
+# **Scale up first; scale out when you must.** One machine is enough for most tables: DuckDB and Polars handle hundreds
+# of gigabytes on a large VM, with no cluster to run, and every lab so far ran on a laptop. A cluster earns its cost
+# when:
+# - a single job reads **terabytes**, more than one machine can scan in the time you have;
+# - the work must finish inside a **window** (say 01:00 to 05:00) that one machine can't meet;
+# - **many teams** share one platform, its data and its compute.
+#
+# And you will meet Spark anyway: Databricks, AWS EMR and Glue, Google Dataproc and Microsoft Fabric all run it, and
+# many existing pipelines are written in it. Spark 4 (2025–26) brought ANSI SQL by default, a `VARIANT` type for JSON,
+# Spark Connect (a thin client talking to a remote cluster) and Arrow everywhere between the JVM and Python.
+#
+# The data here fits on a laptop many times over; we run Spark on it to **see** how a cluster splits the work.
+#
 # ## 1 · Why Spark: one driver, many executors
 #
 # **The idea.** One machine reads data at a fixed speed, and the data keeps growing. Spark splits the data into pieces
@@ -91,6 +116,20 @@ print("Spark UI:", spark.sparkContext.uiWebUrl)
 V.spark_cluster(spark.sparkContext.master, spark.sparkContext.defaultParallelism)
 
 # %% [markdown]
+# The words you'll read in the UI and in every Spark error message:
+#
+# | Word | Is |
+# |---|---|
+# | **driver** | your program: builds and optimizes the plan, schedules the tasks |
+# | **cluster manager** | hands out machines: YARN, Kubernetes, standalone, or a managed service |
+# | **executor** | a JVM process on a worker machine; runs tasks on its cores, can cache data |
+# | **job** | the work one **action** starts (`count`, `show`, `write`, `collect`) |
+# | **stage** | a run of work with no shuffle; each shuffle starts a new stage |
+# | **task** | one stage on one **partition**; tasks run in parallel on executor cores |
+#
+# Here everything runs in one process (`local[2]`): driver and executors share this machine. The code is the same on a
+# 1,000-node cluster; only the master changes.
+#
 # **The proof** is the **Spark UI**: Jobs → Stages → Tasks, with time and rows per task. It's where you debug real jobs.
 # On Colab, this cell opens it in a new browser tab (keep it open and refresh it after each action below).
 
@@ -131,6 +170,29 @@ V.partitions(parts, cores=spark.sparkContext.defaultParallelism)
 # %% [markdown]
 # With 2 cores, two tasks run at a time; on a cluster with 400 cores, 400 do. So we want **more partitions than cores**
 # (every core stays busy), but not millions of tiny ones (each task has a fixed start-up cost).
+#
+# ✏️ **Exercise 1** · Double the split size to 512 KB and read `order_items` again.
+# - **Result:** `n_512`, the number of partitions of the new read.
+# - **Check yourself:** fewer partitions than at 256 KB, and the same rows.
+
+# %%
+# Template:
+# spark.conf.set("spark.sql.files.maxPartitionBytes", "___")
+# items_512 = spark.read.parquet((LAKE / "order_items.parquet").as_posix())
+# n_512 = items_512.rdd.___()
+# BEGIN SOLUTION
+spark.conf.set("spark.sql.files.maxPartitionBytes", "512k")
+items_512 = spark.read.parquet((LAKE / "order_items.parquet").as_posix())
+n_512 = items_512.rdd.getNumPartitions()
+# END SOLUTION
+print("partitions at 256 KB:", items.rdd.getNumPartitions(), "| at 512 KB:", n_512)
+
+# %%
+U.check(n_512 < items.rdd.getNumPartitions(), "bigger splits, fewer partitions: fewer, longer tasks")
+U.check(items_512.count() == items.count(), "the same rows, cut differently")
+spark.conf.set("spark.sql.files.maxPartitionBytes", "256k")   # back to the setting the rest of the notebook uses
+
+# %% [markdown]
 #
 # ## 3 · Lazy evaluation: transformations plan, actions run
 #
@@ -216,6 +278,37 @@ V.shuffle(moves, key="product_id", n_out=8)
 
 # %%
 units.orderBy(F.desc("units")).show(5)
+
+# %% [markdown]
+# ✏️ **Exercise 2** · Narrow or wide? `distinct()` keeps one row per value. Build `products_sold`, the distinct
+# `product_id`s of `big_baskets`, and capture its plan as text.
+# - **Result:** `products_sold` (a DataFrame) and `plan_text`, the text `explain()` prints.
+# - **Check yourself:** decide first: does each task know which products the **other** tasks have seen?
+
+# %%
+import contextlib, io
+
+
+def plan_of(df):
+    """The physical plan explain() prints, as a string."""
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        df.explain()
+    return buffer.getvalue()
+
+# Template:
+# products_sold = big_baskets.select("___").___()
+# plan_text = plan_of(___)
+# BEGIN SOLUTION
+products_sold = big_baskets.select("product_id").distinct()
+plan_text = plan_of(products_sold)
+# END SOLUTION
+print(plan_text)
+
+# %%
+U.check("Exchange hashpartitioning(product_id" in plan_text, "wide: an Exchange sends each product_id to one task")
+U.check(plan_text.count("HashAggregate") == 2, "and, like groupBy, a partial step before the shuffle and a final one after")
+U.check(products_sold.count() == big_baskets.select("product_id").toPandas().product_id.nunique(), "one row per product")
 
 # %% [markdown]
 # ## 5 · Joins: broadcast vs. sort-merge
@@ -306,7 +399,23 @@ V.files(out)
 spark.stop()
 
 # %% [markdown]
-# ## Recap → Lab 3.2
+# ## 8 · Back to the map
+#
+# Spark **transforms** at scale: the same work as DuckDB or Polars, spread over a cluster.
+
+# %%
+V.platform_map(tool="spark")
+
+# %% [markdown]
+# | | |
+# |---|---|
+# | **It does** | DataFrame and SQL transformations over many machines · reads and writes Parquet, Iceberg and Delta tables · batch and streaming (Structured Streaming) · Python, SQL, Scala and Java on one engine |
+# | **It doesn't** | pay off on data one machine handles (start-up, shuffles and a cluster to run) · store tables itself (a table format does: `df.writeTo("cat.db.orders").append()`) · schedule its jobs (Dagster, Day 4) |
+# | **In this course** | Lab 3.2: one metric three ways, partition pruning, broadcast timing, salting, small files |
+# | **Managed equivalents** | Databricks, AWS EMR and Glue, Google Dataproc, Microsoft Fabric, Azure Synapse: Spark with the cluster run for you |
+# | **Neighbours** | DuckDB, Polars (one machine, often enough) · Trino (distributed SQL over a lake) · Flink (streaming first) · Ray, Dask (distributed Python) |
+#
+# **Recap**
 #
 # | We saw | Because |
 # |---|---|
@@ -318,5 +427,13 @@ spark.stop()
 # | 2 of 8 tasks did all the work | one key → one task: skew |
 # | 6 partitions → 6 files | each task writes its own file |
 #
-# **Lab 3.2**: one metric three ways (DataFrame API, SQL, DuckDB), partition pruning, switching broadcast off and timing it,
-# salting the hot day, and the small-files count with `partitionBy`.
+# ## Checkpoint
+#
+# 1. A 40 GB daily job runs in DuckDB in 6 minutes. Should it move to Spark? What would change your answer?
+# 2. Job, stage, task: which one does an action start, what starts a new stage, and what is one task?
+# 3. Name two narrow and two wide operations. What does a wide one cost, and why?
+# 4. A stage's 200 tasks finish in 30 s, but one runs for 40 minutes. What is the likely cause, and two fixes?
+# 5. Why did 6 partitions write 6 files, and what happens with `partitionBy("day")` over a year?
+#
+# **Next: [Lab 3.2 · Spark](../D3_2_spark.ipynb)**: one metric three ways (DataFrame API, SQL, DuckDB), partition
+# pruning, switching broadcast off and timing it, salting the hot day, and the small-files count with `partitionBy`.

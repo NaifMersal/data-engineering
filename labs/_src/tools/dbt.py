@@ -1,8 +1,8 @@
 # %% [markdown]
 # # dbt, from an empty folder to a tested report
 #
-# Day 2, before Lab 2.3 · about 100 min · CPU only. You build a small dbt project file by file and read every piece of
-# SQL dbt generates from it, so nothing in Lab 2.3's big project is magic.
+# Day 2, before Lab 2.3 · CPU only. You build a small dbt project file by file and read every piece of SQL dbt
+# generates from it, so nothing in Lab 2.3's big project is magic. §9 also teaches the dbt tests Lab 2.4 uses.
 #
 # **The question:** how much delivered product revenue came from each store city? The rows are invented and small
 # enough to check by hand (SAR, without delivery fees).
@@ -12,19 +12,30 @@
 # **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
 # then run the cell and the check after it (✅ = right). Answers: `solutions/tools/dbt.ipynb`.
 #
-# **Tasks**
-# - [ ] 1 · Raw data: what dbt does not load (5')
-# - [ ] 2 · The problem: three SQL files, run by hand (10')
-# - [ ] 3 · A project, a profile and its sources (10')
-# - [ ] 4 · A `SELECT` becomes a view (10')
-# - [ ] 5 · `ref()` builds a graph, and the graph sets the order (15')
-# - [ ] 6 · Materializations: view, table, incremental; break one on purpose (25')
-# - [ ] 7 · Macros: write an expression once (5')
-# - [ ] 8 · Tests: a build that succeeds is not a correct build (15')
-# - [ ] 9 · Lineage, documentation, and one more model of your own (10')
+# **Contents**
+# - [ ] 1 · Raw data: what dbt does not load
+# - [ ] 2 · The problem: three SQL files, run by hand
+# - [ ] 3 · The mental model: a graph of `SELECT`s
+# - [ ] 4 · A project, a profile and its sources
+# - [ ] 5 · Hello world: a `SELECT` becomes a view
+# - [ ] 6 · `ref()` builds a graph, and the graph sets the order
+# - [ ] 7 · Materializations: view, table, incremental; break one on purpose
+# - [ ] 8 · Macros: write an expression once
+# - [ ] 9 · Tests: a build that succeeds is not a correct build
+# - [ ] 10 · Lineage, documentation, and one more model of your own
+# - [ ] 11 · Back to the map
+
+# %% [markdown] 🎓
+# 🎓 **Instructor notes** (solution notebook only)
+#
+# - Walked in class so far in about 70' (before §9's severity, contract and unit-test parts were added). §7 is the
+#   longest: 7c (strategies) can be left for the students' own pace; Lab 2.3 §3–4 applies 7b to the real fact.
+# - §9's warn / contract / unit-test cells teach the mechanisms Lab 2.4 uses, on different cases: Lab 2.4 writes a
+#   `relationships` test with `severity: warn`, breaks a contract with a type change, and unit-tests mobile numbers.
+# - Every `dbt(...)` call takes a few seconds in process; a full run of this notebook is a few minutes.
 
 # %% [markdown]
-# ## 1 · Raw data: what dbt does not load (5')
+# ## 1 · Raw data: what dbt does not load
 #
 # Run from `labs/` (`uv run jupyter lab`) or in Colab.
 
@@ -39,7 +50,7 @@ if IN_COLAB:
         subprocess.run(["git", "clone", "-q", REPO_URL, "/content/data-engineering"], check=True)
     os.chdir("/content/data-engineering/labs")
     subprocess.run([sys.executable, "-m", "pip", "install", "-q",
-                    "duckdb>=1.4", "dbt-core>=1.10,<2", "dbt-duckdb>=1.11"], check=True)
+                    "duckdb>=1.4,<2", "dbt-core>=1.10,<2", "dbt-duckdb>=1.11"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
         os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/
@@ -121,7 +132,7 @@ display(sql("SELECT * FROM raw.order_items ORDER BY order_id, line_no"))
 #
 # 🔍 Riyadh (order 101): 33.46 + 2 × 121.20 = **275.86**. Jeddah: **33.65** (order 103 is cancelled).
 #
-# ## 2 · The problem: three SQL files, run by hand (10')
+# ## 2 · The problem: three SQL files, run by hand
 #
 # Before dbt, let's build the report the way many teams start: a folder of SQL files, each one creating a table from
 # the one before.
@@ -220,15 +231,16 @@ V.sql_steps([
 ])
 
 # %% [markdown]
-# Each pain above has a dbt answer, and each one is a task of this lab:
+# Each pain above has a dbt answer, and each one has a section below:
 #
-# | By hand | With dbt | Task |
+# | By hand | With dbt | § |
 # |---|---|---|
-# | you must know the run order | `ref()` and `source()` become a graph; dbt runs it in order | 5 |
-# | after a change, you must know what to rerun | `--select orders_clean+` = it and everything downstream | 5, 6 |
-# | `CREATE OR REPLACE` in every file | one setting: view, table or incremental | 4, 6 |
-# | the same expression copied in many files | a macro, written once | 7 |
-# | nobody checks the result | tests that run with the build | 8 |
+# | you must know the run order | `ref()` and `source()` become a graph; dbt runs it in order | 6 |
+# | after a change, you must know what to rerun | `--select orders_clean+` = it and everything downstream | 6, 7 |
+# | `CREATE OR REPLACE` in every file | one setting: view, table or incremental | 5, 7 |
+# | the same expression copied in many files | a macro, written once | 8 |
+# | nobody checks the result | tests that run with the build | 9 |
+# | a renamed column breaks a dashboard | a contract on the model's columns and types | 9 |
 #
 # dbt doesn't run the SQL itself: it generates it and sends it to a database, here DuckDB. And it doesn't load data:
 # the raw tables come from ingestion.
@@ -237,7 +249,27 @@ V.sql_steps([
 #
 # 🔍 No. Files are instructions; only a dbt command (`dbt run`, `dbt build`) changes the database.
 #
-# ## 3 · A project, a profile and its sources (10')
+# ## 3 · The mental model: a graph of `SELECT`s
+#
+# ```
+#  models/*.sql  (one SELECT each,           dbt reads them all     dbt renders the Jinja      the warehouse
+#  source() and ref() inside)           →    and draws the graph →  and sends the SQL in   →   (DuckDB here) runs
+#  _sources.yml, _models.yml (tests)         target/manifest.json   graph order, then tests    every statement
+#  └────────────── you write this ──────────────┘ └──────────────────── dbt does this ────────────────────┘
+# ```
+#
+# | You declare | dbt does |
+# |---|---|
+# | a `SELECT` in a file named after the result | wraps it in `CREATE VIEW` / `CREATE TABLE` / `INSERT`, under a temporary name, then swaps it in |
+# | what it reads: `source()` for raw tables, `ref()` for models | draws the graph, builds parents before children, independent branches in parallel |
+# | how to store it: `view`, `table`, `incremental` | writes the right SQL for this database (the **adapter**) |
+# | what must be true: tests, contracts | runs each test right after its model, and skips what depends on a failure |
+# | descriptions | documentation and lineage, from the same files |
+#
+# dbt is a **compiler and a runner**, not a database: it never stores a row, and it never loads data. The model design
+# (what one row means, which rows count as revenue) is still yours (Lab 2.2).
+#
+# ## 4 · A project, a profile and its sources
 #
 # Two files make a folder a dbt project:
 # - `dbt_project.yml`: what the project is, and how to build its models;
@@ -284,11 +316,11 @@ qafila_intro:
 # | `profile` | which entry of `profiles.yml` to connect with |
 # | `model-paths`, `test-paths` | the folders holding models and tests (these are the defaults, written out) |
 # | `models:` → `qafila_intro:` → `staging:` | settings for every model in `models/staging/` |
-# | `+materialized` | how those models are stored: `view`, `table`, ... (Task 6) |
+# | `+materialized` | how those models are stored: `view`, `table`, ... (§7) |
 # | `+schema` | the schema they go to, **appended** to the profile's: `analytics` + `staging` → `analytics_staging` |
 #
 # The `+` marks a setting, so dbt doesn't read `materialized` as a folder name. A model can override its folder's
-# settings with `{{ config(...) }}` at the top of its file (Task 6).
+# settings with `{{ config(...) }}` at the top of its file (§7).
 #
 # **`profiles.yml`**:
 #
@@ -415,7 +447,7 @@ U.check(len(sql("FROM information_schema.tables")) == 3, "still the same 3 raw t
 # %% [markdown]
 # 🔍 Still three: a source only **describes** data that something else loaded.
 #
-# ## 4 · A `SELECT` becomes a view (10')
+# ## 5 · Hello world: a `SELECT` becomes a view
 #
 # The file name `stg_orders.sql` becomes the view's name; its folder makes it a view. (`stg_` = staging: one model per
 # source table, rename and cast, no business logic.)
@@ -469,7 +501,7 @@ U.check(sql("SELECT table_type FROM information_schema.tables WHERE table_name =
 # 🔍 dbt picked the schema, created it, wrapped our `SELECT` in `create view`, and sent it to DuckDB. It builds under a
 # temporary name (`__dbt_tmp`) and renames at the end, so nobody reads a half-built model.
 #
-# ## 5 · `ref()` builds a graph, and the graph sets the order (15')
+# ## 6 · `ref()` builds a graph, and the graph sets the order
 #
 # `stg_order_items` gives each line an id (`101-2`) and its `net_amount`: one row per line.
 
@@ -586,10 +618,22 @@ print("+mart_hardcoded  →", dbt("ls", "--select", "+mart_hardcoded", "--output
 # | `fct_order_items+` | it and its children |
 # | `staging` | the `models/staging/` folder |
 #
-# The folders are **layers**: staging (clean each source) → intermediate (reshape for reuse, e.g. Lab 2.3's payments →
-# one row per order) → marts (facts and reports at a declared grain).
+# The folders are **layers**, and each answers a different question. They are how dbt organises the platform's
+# **silver** and **gold** zones; **bronze** is the `raw` schema, which dbt only reads. In Lab 2.3's project:
 #
-# ## 6 · Materializations: view, table, incremental; break one on purpose (25')
+# | Folder | Qafila example (Lab 2.3) | Its job | Zone |
+# |---|---|---|---|
+# | `staging/` | `stg_orders` | one model per source table: rename, cast, derive the order date; no business logic | silver |
+# | `intermediate/` | `int_payments_per_order` | reshape for reuse: payment attempts → one row per order | silver |
+# | `marts/` | `fct_order_items`, `fct_orders`, `dim_customers` | facts and dimensions at a declared grain | gold |
+# | `marts/` | `mart_daily_city_sales` | a report for one business question | gold |
+# | `quarantine/` | `qrn_order_items` | the rows kept out of the facts, each with its reason | beside silver |
+#
+# Watch the names: `stg_` models are **cleaned** (silver), although a warehouse's "stage" area usually means the
+# landed copy (bronze). And the payments are reduced to one row per order **before** they meet the orders, so several
+# payment attempts can't multiply an order's amount (the fan-out of Lab 2.2).
+#
+# ## 7 · Materializations: view, table, incremental; break one on purpose
 #
 # | `materialized=` | Stores | The work happens |
 # |---|---|---|
@@ -598,7 +642,7 @@ print("+mart_hardcoded  →", dbt("ls", "--select", "+mart_hardcoded", "--output
 # | `incremental` | rows, updated each run | at `dbt run`, over the rows its filter selects |
 # | `ephemeral` | nothing (pasted into its readers as a CTE) | inside the readers |
 #
-# ### 6a · A view sees a change at once; a table needs a rebuild
+# ### 7a · A view sees a change at once; a table needs a rebuild
 #
 # 🤔 **Predict** · Order 103 is now delivered in the source. Which shows it first: the view or the table?
 
@@ -626,7 +670,7 @@ U.check(city("Jeddah") == 45.65, "after the rebuild, Jeddah includes order 103's
 V.animate_dbt(PROJ)
 
 # %% [markdown]
-# ### 6b · An incremental model processes only the rows that changed
+# ### 7b · An incremental model processes only the rows that changed
 #
 # It loads everything on the first run, then only the rows its filter selects. Three choices are ours:
 # - **filter:** orders updated at most 1 day before the newest one loaded (the **overlap** catches late changes);
@@ -640,7 +684,7 @@ V.animate_dbt(PROJ)
 # | `{{ config(...) }}` | settings for this model only; they override the folder's `+materialized: table` |
 # | `materialized='incremental'` | keep the table between runs and add to it |
 # | `unique_key='order_line_id'` | the column that identifies a row |
-# | `incremental_strategy='delete+insert'` | how the new rows are written into the table (6c lists the others) |
+# | `incremental_strategy='delete+insert'` | how the new rows are written into the table (7c lists the others) |
 # | `{% if is_incremental() %} ... {% endif %}` | the filter, left out on the first run and with `--full-refresh` |
 # | `{{ this }}` | the model's own table, so the filter can ask what's already loaded |
 
@@ -707,9 +751,9 @@ V.sql_steps([
 ])
 
 # %% [markdown]
-# `unique_key` matches rows; it doesn't **check** that they're unique. Only a test does (Task 8).
+# `unique_key` matches rows; it doesn't **check** that they're unique. Only a test does (§9).
 #
-# ### 6c · Other strategies, and one side by side
+# ### 7c · Other strategies, and one side by side
 #
 # `incremental_strategy` decides how the batch the filter selected is written into the table:
 #
@@ -745,7 +789,7 @@ write_file("models/marts/fct_order_items_incremental.sql", INCREMENTAL_SQL)   # 
 # Every strategy writes only what the filter selected. So what happens when a row changes and the filter doesn't
 # select it?
 #
-# ### 6d · 🧪 Break it on purpose: a change the filter can't see
+# ### 7d · 🧪 Break it on purpose: a change the filter can't see
 #
 # 🤔 **Predict** · Line 102-1 gets a 2 SAR discount. The line changes; its order's `updated_at` doesn't. After
 # rebuilding both facts, which one has the discount?
@@ -785,7 +829,7 @@ dbt("run", "--select", "fct_order_items+")
 U.check(city("Jeddah") == 43.65, "and the report shows it: 31.65 + 12.00 for Jeddah, nothing for refunded Riyadh")
 
 # %% [markdown]
-# ## 7 · Macros: write an expression once (5')
+# ## 8 · Macros: write an expression once
 #
 # `quantity * unit_price - discount` is our revenue definition; copies of it drift apart. A **macro** is named Jinja
 # that returns SQL text. dbt pastes it in before the SQL reaches the database.
@@ -832,12 +876,12 @@ U.check("(quantity * unit_price - discount)" in generated("compiled", "models/st
 U.check(city("Jeddah") == 43.65, "same revenue as before: the definition moved, it didn't change")
 
 # %% [markdown]
-# ## 8 · Tests: a build that succeeds is not a correct build (15')
+# ## 9 · Tests: a build that succeeds is not a correct build
 #
 # A **test** is a `SELECT` of the rows that **break** a rule: 0 rows = pass. **Generic** tests (`unique`, `not_null`,
 # ...) are declared in YAML; **singular** tests are SQL files in `tests/`.
 #
-# In `_models.yml`, each `- name:` is a model; `description` goes into the documentation (Task 9); under `columns:`,
+# In `_models.yml`, each `- name:` is a model; `description` goes into the documentation (§10); under `columns:`,
 # `data_tests: [unique, not_null]` attaches those two tests to that column. A test that takes settings is written as a
 # mapping: `accepted_values` gets the list of allowed values under `arguments:`, so a new or misspelled `status` fails.
 
@@ -960,7 +1004,193 @@ result = dbt("test", "--select", "assert_city_revenue_nonnegative")
 U.check([r.status for r in result.result] == ["pass"], "dbt ran your test, and no city breaks the rule")
 
 # %% [markdown]
-# ## 9 · Lineage, documentation, and one more model of your own (10')
+# ### 9a · Warn or error: decide what a failure means
+#
+# The source team adds a status: order 101 is now `refunded`. Someone wrote a test on `stg_orders` that only knows
+# three statuses.
+#
+# 🤔 **Predict** · `dbt build` of the report. With the default severity (`error`), what happens to the fact and the
+# report?
+
+# %%
+STATUS_TEST = """
+version: 2
+models:
+  - name: stg_orders
+    columns:
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [placed, delivered, cancelled]
+"""
+write_file("models/staging/_staging.yml", STATUS_TEST)
+dbt("build", "--select", "+mart_city_sales", expect_success=False)
+statuses = {r["unique_id"].split(".")[2]: r["status"]
+            for r in json.loads((PROJ / "target/run_results.json").read_text(encoding="utf-8"))["results"]}
+U.check(statuses["fct_order_items"] == "skipped" and statuses["mart_city_sales"] == "skipped",
+        "error: the failing test on stg_orders skipped the fact and the report")
+
+# %% [markdown]
+# 🔍 One unknown value stopped the whole report. Sometimes that's right (a duplicated key in a fact). Here the new
+# status is a known source change that someone should look at, not a reason to stop. `severity: warn` records the
+# failure and lets the build go on:
+
+# %%
+write_file("models/staging/_staging.yml", STATUS_TEST + """              config:
+                severity: warn
+""")
+dbt("build", "--select", "+mart_city_sales")
+statuses = {r["unique_id"].split(".")[2]: r["status"]
+            for r in json.loads((PROJ / "target/run_results.json").read_text(encoding="utf-8"))["results"]}
+U.check([s for name, s in statuses.items() if name.startswith("accepted_values_stg_orders")] == ["warn"],
+        "warn: the failure is recorded...")
+U.check(statuses["mart_city_sales"] == "success", "...and the report is built")
+(PROJ / "models/staging/_staging.yml").unlink()
+
+# %% [markdown]
+# Three responses, three jobs:
+#
+# | Response | What happens | Qafila example |
+# |---|---|---|
+# | **error** | the test fails and `dbt build` skips everything downstream | a duplicated fact key |
+# | **warn** | the failure is recorded, the build continues; someone must follow it up | a new source status, an erased customer |
+# | **quarantine** | a model routes the rejected rows to their own table, with a reason; the rest is published | non-positive quantities (`qrn_order_items`, Lab 2.3) |
+#
+# Quarantine is not a test setting: it's a model whose `WHERE` is the opposite of the fact's. Rows in the fact plus
+# rows in quarantine should add up to the source.
+#
+# ### 9b · A contract: the columns consumers rely on
+#
+# Tests check **values**. A dashboard also relies on the **shape** of a model: its column names and types. An enforced
+# **contract** declares them, and dbt refuses to build a model whose `SELECT` doesn't match, before it replaces the
+# table.
+
+# %%
+CONTRACT_YML = """
+version: 2
+models:
+  - name: fct_order_items
+    description: One row per order line with a positive quantity; keeps the order's status.
+    columns:
+      - name: order_line_id
+        data_tests: [unique, not_null]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [placed, delivered, cancelled,
+                         refunded, failed_delivery]
+  - name: fct_order_items_incremental
+    columns:
+      - name: order_line_id
+        data_tests: [unique, not_null]
+  - name: mart_city_sales
+    description: Delivered product revenue in SAR by store city, excluding delivery fees.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: city
+        data_type: varchar
+        data_tests: [unique, not_null]
+      - name: revenue_sar
+        data_type: decimal(38,2)
+"""
+write_file("models/marts/_models.yml", CONTRACT_YML)
+dbt("build", "--select", "mart_city_sales")
+
+# %% [markdown]
+# A developer tidies the report and renames `revenue_sar` to `revenue`. The SQL is valid.
+#
+# 🤔 **Predict** · Does the build succeed? What does the dashboard see afterwards?
+
+# %%
+REPORT = (PROJ / "models/marts/mart_city_sales.sql").read_text(encoding="utf-8")
+write_file("models/marts/mart_city_sales.sql", REPORT.replace("AS revenue_sar", "AS revenue"))
+broken = dbt("build", "--select", "mart_city_sales", log=False, expect_success=False)
+print([line for line in str(broken.result[0].message).splitlines() if "revenue" in line][:4])
+U.check(not broken.success, "the contract stopped the build")
+U.check(list(sql("FROM analytics_marts.mart_city_sales").columns) == ["city", "revenue_sar"],
+        "and the table the dashboard reads still has revenue_sar")
+write_file("models/marts/mart_city_sales.sql", REPORT)
+dbt("build", "--select", "mart_city_sales")
+
+# %% [markdown]
+# 🔍 The mismatch table names the missing and the unexpected column, and nothing reached the database. Changing a
+# contract is a decision taken with the consumers (a new model version, Day 4), not a quiet edit. A contract checks
+# names and types, not values: a `revenue_sar` of -5 still fits it, which is why the tests stay.
+#
+# ### 9c · A unit test: check the logic on rows you choose
+#
+# Data tests check today's data. A **unit test** gives a model a few input rows **you** write and compares its output
+# with the rows you expect, so it can test a case that today's data doesn't contain, like a discount on a line of
+# three.
+
+# %%
+write_file("models/staging/_unit_tests.yml", """
+unit_tests:
+  - name: net_amount_subtracts_the_discount
+    model: stg_order_items
+    given:
+      - input: source('qafila_raw', 'order_items')
+        rows:
+          - {order_id: 1, line_no: 1, quantity: 2, unit_price: 10.00, discount: 0.00}
+          - {order_id: 1, line_no: 2, quantity: 3, unit_price: 5.50, discount: 1.50}
+    expect:
+      rows:
+        - {order_line_id: "1-1", net_amount: 20.00}
+        - {order_line_id: "1-2", net_amount: 15.00}
+""")
+result = dbt("test", "--select", "test_type:unit")
+U.check([r.status for r in result.result] == ["pass"], "the model computes 2 × 10 = 20 and 3 × 5.50 − 1.50 = 15")
+
+# %% [markdown]
+# 🧪 **Break it on purpose** · Someone "simplifies" the macro and drops the discount.
+#
+# 🤔 **Predict** · Which tests notice: the data tests (`unique`, `not_null`, the singular ones) or the unit test?
+
+# %%
+MACRO = (PROJ / "macros/net_amount.sql").read_text(encoding="utf-8")
+write_file("macros/net_amount.sql", MACRO.replace(" - {{ discount }}", ""))
+data_tests = dbt("build", "--exclude", "test_type:unit", log=False)
+unit = dbt("test", "--select", "test_type:unit", log=False, expect_success=False)
+print("data tests:", sorted({str(r.status) for r in data_tests.result if r.node.resource_type == "test"}))
+print("unit test: ", [str(r.status) for r in unit.result])
+U.check(data_tests.success and not unit.success, "only the unit test fails: the data still looks fine")
+U.check(city("Jeddah") == 45.65, "and the report is wrong by the 2 SAR discount (43.65 before)")
+write_file("macros/net_amount.sql", MACRO)
+dbt("build")
+U.check(city("Jeddah") == 43.65, "macro restored: the report is right again")
+
+# %% [markdown]
+# 🔍 The data tests pass: no key is duplicated, no value is null, no revenue is negative. The numbers are simply wrong
+# by every discount. Only a test that knows the expected answer catches a wrong rule. A plain `dbt build` runs each
+# unit test **before** its model, so with the unit test in place this rule would never have reached the table.
+#
+# ### 9d · Where each check belongs
+#
+# | Where | Check | Catches | In this course |
+# |---|---|---|---|
+# | a file or DataFrame at the door | Pandera schema | bad values before they are loaded | Lab 2.4 |
+# | the logic of a model | dbt unit test | a wrong rule, on rows you chose | §9c, Lab 2.4 |
+# | the tables just built | dbt data tests | broken keys, nulls, unknown values, orphans | §9, Labs 2.3–2.4 |
+# | the model's interface | dbt contract | renamed or retyped columns | §9b, Lab 2.4 |
+# | production, after release | freshness, volume, Unknown rate | changes nobody tested for | Day 4 |
+#
+# **Before a change is merged**, CI (continuous integration) builds it in its own schema and runs these checks. dbt can
+# build only what the change touches:
+#
+# ```
+# dbt build --select state:modified+ --defer --state prod-artifacts/
+# ```
+#
+# `state:modified+` = the models whose files differ from production's `manifest.json` (in `prod-artifacts/`), and their
+# children; `--defer` reads the unchanged parents from production instead of rebuilding them. A real CI job also needs
+# its own credentials and target schema.
+
+# %% [markdown]
+# ## 10 · Lineage, documentation, and one more model of your own
 #
 # `target/manifest.json` (the graph) and `target/run_results.json` (the last command) are what the players read.
 # Orchestrators read them too (Lab 4.1).
@@ -984,6 +1214,9 @@ print("Documentation files:", [f for f in ["index.html", "manifest.json", "catal
 # | `dbt build` | builds and tests, along the graph |
 # | `dbt ls` | lists what a selection selects |
 # | `dbt docs generate` | writes the documentation |
+# | `dbt run --full-refresh` | rebuilds incremental models from all rows (§7d) |
+# | `dbt test --select test_type:unit` | only the unit tests (§9c) |
+# | `dbt source freshness` | checks when each source last received data (Day 4) |
 #
 # ✏️ **Exercise 5** · Write `models/marts/mart_city_order_counts.sql`: delivered **orders** per city, as
 # `delivered_orders`, from `stg_orders` and `stg_stores`.
@@ -1017,6 +1250,23 @@ dbt("build")
 print("Your complete project is in:", PROJ)
 
 # %% [markdown]
+# ## 11 · Back to the map
+#
+# dbt **transforms** inside the warehouse (silver in `staging/` and `intermediate/`, gold in `marts/`), **tests**
+# what it built, and documents it; the warehouse runs the SQL.
+
+# %%
+V.platform_map(tool="dbt")
+
+# %% [markdown]
+# | | |
+# |---|---|
+# | **It does** | SQL `SELECT`s as a project in Git · the build order from `ref()` / `source()` · views, tables, incremental models · macros · data tests, unit tests, contracts · documentation and lineage (`manifest.json`) |
+# | **It doesn't** | load data (dlt, Lab 1.3) · store or compute anything itself (the warehouse does) · schedule runs (Dagster, Lab 4.1) · design the model for you (Lab 2.2) |
+# | **In this course** | Lab 2.3 builds the Qafila project (`dbt_qafila/`) · Lab 2.4 adds tests, a contract and a unit test · Lab 4.1 runs it from Dagster, one asset per model · Lab 4.2's contracts and freshness |
+# | **Managed equivalents** | dbt Cloud (the same project with scheduling, an IDE and CI) · SQLMesh / Tobiko Cloud · warehouse-native tools: Dataform (BigQuery), Snowflake Dynamic Tables, Databricks Lakeflow Declarative Pipelines |
+# | **Neighbours** | SQLMesh (similar models, with plans and virtual environments) · Dagster (orchestrates dbt, Lab 4.1) · Polars / Spark (transformations in Python instead of SQL) |
+#
 # ## Checkpoint
 #
 # 1. Why did `_sources.yml` load nothing, and why did `dbt compile` create no view?
@@ -1024,12 +1274,16 @@ print("Your complete project is in:", PROJ)
 # 3. View or table: which sees a source change at once, and what does it cost?
 # 4. A bug in `stg_orders` hit every historical order. Which command fixes and tests everything downstream?
 # 5. A `unique` test failed in `dbt build`. What was skipped, and was the bad data already published?
+# 6. A new source status should be looked at, not stop the report. Which severity, and who follows it up?
+# 7. A contract, a data test and a unit test: which one catches a renamed column, a duplicated key, a wrong formula?
 #
 # Next: [Lab 2.3 · The Qafila dbt project](../D2_3_dbt_project.ipynb). Docs:
 # [materializations](https://docs.getdbt.com/docs/build/materializations) ·
 # [incremental](https://docs.getdbt.com/docs/build/incremental-models) ·
 # [macros](https://docs.getdbt.com/docs/build/jinja-macros) ·
 # [tests](https://docs.getdbt.com/docs/build/data-tests) ·
+# [contracts](https://docs.getdbt.com/docs/mesh/govern/model-contracts) ·
+# [unit tests](https://docs.getdbt.com/docs/build/unit-tests) ·
 # [selection](https://docs.getdbt.com/reference/node-selection/syntax).
 #
 # ## 🖼️ Visual summary
