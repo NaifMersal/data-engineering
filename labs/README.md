@@ -30,6 +30,8 @@ Session 1.3 is taught from [`tools/dlt.ipynb`](tools/dlt.ipynb), with no slides:
 
 Session 2.4 starts from [`tools/pandera.ipynb`](tools/pandera.ipynb): a day of payments with six problems, checked first with hand-written asserts (one failure per run, nulls slip through), then with a Pandera schema: types and nulls, built-in and custom checks, every failure at once with its row, a quarantine split, and the LazyFrame trap broken on purpose. It ends by mapping each rule to its dbt test and running the schema on the real payments feed. Three short exercises; Lab 2.4 then validates the supplier price files.
 
+Session 4.1 is taught from [`tools/dagster.ipynb`](tools/dagster.ipynb), with no slides: a nightly script breaks the usual ways (a re-run loads a day twice, a refund flows into the report, nobody knows what was built when), then the same pipeline as Dagster assets. Selecting part of the graph, the run history and stale assets, resources for dev and prod, a partitioned asset that doubles its rows on a re-run until it is made idempotent, a non-blocking and a blocking asset check, schedules, a sensor with a cursor, retries, and a small dbt project whose models and tests join the graph. A player replays each run from its event log. Three short exercises; Lab 4.1 then orchestrates the real warehouse.
+
 **Lab 3.2 (Spark)** needs Java 17+. On Colab the lab installs it. Locally, install a JDK (for example [Temurin 21](https://adoptium.net/)), set `JAVA_HOME`, then `uv sync --extra spark`. On native Windows, Spark also needs `winutils.exe` to write files, so Windows users should run Lab 3.2 on Colab (or in WSL).
 
 Set `DE_QUICK=1` to shrink the heavier workloads. Useful on slow laptops and for checking that notebooks run.
@@ -57,6 +59,7 @@ Set `DE_QUICK=1` to shrink the heavier workloads. Useful on slow laptops and for
 | 3 | Spark | [`D3_2_spark.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_2_spark.ipynb) | **Colab** (or Java 17+) |
 | 3 | Streaming fundamentals | [`D3_3_streaming_fundamentals.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_3_streaming_fundamentals.ipynb) | CPU |
 | 3 | Streams into the lakehouse | [`D3_4_stream_to_lakehouse.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_4_stream_to_lakehouse.ipynb) | CPU |
+| 4 | Walkthrough: Dagster, assets on a schedule (taught before Lab 4.1) | [`tools/dagster.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dagster.ipynb) | CPU |
 | 4 | Orchestration (Dagster) | [`D4_1_orchestration_dagster.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_1_orchestration_dagster.ipynb) | CPU |
 | 4 | Contracts & observability | [`D4_2_contracts_observability.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_2_contracts_observability.ipynb) | CPU |
 | 4 | Governance & privacy | [`D4_3_governance_privacy.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D4_3_governance_privacy.ipynb) | CPU |
@@ -70,6 +73,7 @@ Labs don't depend on each other: from Day 2 on, each lab starts from `U.build_wa
 
 The DuckDB walkthrough is self-contained (`artifacts/tools_duckdb/`): it builds its own 1M-row app database and toy files.
 The Pandera walkthrough is self-contained (`artifacts/tools_pandera/`), apart from reading the payments feed in its last section.
+The Dagster walkthrough is self-contained (`artifacts/tools_dagster/`, including its run history in `dagster_home/`), apart from reading the Qafila dbt project's graph at the end.
 The dlt walkthrough is self-contained too (`artifacts/tools_dlt/`), apart from one look at the local payments API.
 The guided dbt walkthrough is self-contained: it creates its own tiny teaching database and project in `artifacts/tools_dbt/`, without using the shared warehouse. Rerunning its workspace setup cell resets only that walkthrough's generated files. Its student notebook has five exercises; the reference notebook in `solutions/tools/` includes their answers.
 

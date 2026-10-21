@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D2_2 · Dimensional modeling · Modern Data Engineering</title>
+<link rel="icon" href="../assets/img/academy.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link rel="stylesheet" href="../assets/deck/deck.css">
+</head>
+<body>
+<div class="deck" data-day="Day 2" data-course="Modern Data Engineering">
+
+<section class="slide section" data-session="Session 2 · Dimensional modeling"><div class="kicker">Session 2</div><h1>Dimensional modeling</h1><p class="lead mt">Decide what one row means before deciding how to calculate sales.</p><div class="sess-no">02</div><aside class="notes">Use the example order lines throughout this session. Work through grain and fan-out slowly. The SCD2 and alternative-model slides offer context. Lab 2.2 builds Type 1 dimensions, not a historical customer dimension.</aside></section>
+
+<section class="slide top" data-label="You are here">
+  <div class="kicker">Silver → gold</div>
+  <h2>Clean rows become answers: the gold layer</h2>
+  <div class="pmap" data-here="dbt"></div>
+  <aside class="notes">Modeling is the design of the gold layer: facts at a stated grain, dimensions around them. dbt (next session) is how we build it; this session is what to build. The map marks dbt because the models we design here become its marts.</aside>
+</section>
+
+<section class="slide">
+<div class="kicker">The problem and value · Shared sales definitions</div>
+<h2>Clean records still need a sales definition</h2>
+<p class="lead">“How much did we sell?” leaves several decisions open.</p><ul class="bullets small"><li>Do cancelled orders count?</li><li>Does sales include delivery fees?</li><li>Does “by city” mean customer city or store city?</li><li>If a customer moves, should past sales move too?</li></ul><div class="callout tip mt small"><b>Why this matters:</b> A model makes these choices explicit so analysts can reproduce the same answer.</div>
+<aside class="notes">For the worked example, product revenue means delivered line net amounts. Delivery fees remain a separate measure. Use store city, as in the lab business questions. The same model may support multiple metrics, but each needs a definition.</aside>
+</section>
+
+<section class="slide">
+<div class="kicker">The philosophy</div>
+<h2>Dimensional modeling gives each row a clear meaning</h2>
+<p class="lead">Organize data around the business process people want to analyze.</p>
+<ul class="bullets small"><li><b>Grain:</b> state exactly what one row represents.</li><li><b>Facts:</b> store measurements at that grain.</li><li><b>Dimensions:</b> provide the context used to filter and group those measurements.</li></ul>
+<p class="small mt">For Qafila: an order line holds quantity and net amount. Product and store dimensions explain what sold and where.</p>
+<aside class="notes">Dimensional modeling is a design approach. It does not require a particular software tool. Establish the process and grain before choosing measures. The star schema on the next slide shows how the design works. Then trace the actual source rows into it.</aside>
+</section>
+
+<section class="slide">
+<div class="kicker">How it works</div>
+<h2>The star schema connects facts to context</h2>
+<div class="cols cols-2"><div class="figure">
+<svg font-family="IBM Plex Sans, sans-serif" font-size="15" viewbox="0 0 520 400">
+<g stroke="#5b6472" stroke-width="2"><line x1="260" x2="100" y1="200" y2="70"></line><line x1="260" x2="420" y1="200" y2="70"></line><line x1="260" x2="100" y1="200" y2="330"></line><line x1="260" x2="420" y1="200" y2="330"></line></g>
+<rect fill="#1c355e" height="120" rx="12" width="200" x="160" y="140"></rect>
+<text fill="#ffb548" font-weight="700" text-anchor="middle" x="260" y="168">fct_order_items</text>
+<text fill="#fff" font-size="13" text-anchor="middle" x="260" y="192">date_key · customer_key</text>
+<text fill="#fff" font-size="13" text-anchor="middle" x="260" y="210">product_key · store_key</text>
+<text fill="#c9efe6" font-size="13" text-anchor="middle" x="260" y="236">quantity · net_amount</text>
+<g font-size="14">
+<rect fill="#fff" height="70" rx="10" stroke="#00ae8d" stroke-width="2" width="160" x="20" y="30"></rect><text fill="#00ae8d" font-weight="700" text-anchor="middle" x="100" y="58">dim_date</text><text fill="#5b6472" font-size="12" text-anchor="middle" x="100" y="80">weekday · is_weekend</text>
+<rect fill="#fff" height="70" rx="10" stroke="#00ae8d" stroke-width="2" width="160" x="340" y="30"></rect><text fill="#00ae8d" font-weight="700" text-anchor="middle" x="420" y="58">dim_product</text><text fill="#5b6472" font-size="12" text-anchor="middle" x="420" y="80">category · brand</text>
+<rect fill="#fff" height="70" rx="10" stroke="#00ae8d" stroke-width="2" width="160" x="20" y="300"></rect><text fill="#00ae8d" font-weight="700" text-anchor="middle" x="100" y="328">dim_store</text><text fill="#5b6472" font-size="12" text-anchor="middle" x="100" y="350">city · name</text>
+<rect fill="#fff" height="70" rx="10" stroke="#00ae8d" stroke-width="2" width="160" x="340" y="300"></rect><text fill="#00ae8d" font-weight="700" text-anchor="middle" x="420" y="328">dim_customer</text><text fill="#5b6472" font-size="12" text-anchor="middle" x="420" y="350">city · signup (no PII)</text>
+</g>
+</svg>
+</div><div><ul class="bullets small"><li><b>Date:</b> weekday, month, weekend.</li><li><b>Product:</b> name, category, brand.</li><li><b>Store:</b> store name and city.</li><li><b>Customer:</b> analytical attributes such as city.</li></ul><p class="small mt">Each fact key must match exactly one dimension row.</p></div></div>
+<aside class="notes">Use the existing diagram to trace one line through date, product, store, and customer. In this lesson the dimension keys are unique. An SCD2 dimension contains multiple versions per business key, so facts must identify a particular version. The customer analytical dimension omits direct identifiers such as mobile and national ID.</aside>
+</section>
+
+<section class="slide"><div class="kicker">Worked example</div><h2>Two orders from the Qafila dataset</h2><h3>raw.orders · selected columns</h3><table class="t small"><thead><tr><th>order_id</th><th>customer_id</th><th>store_id</th><th>status</th><th>delivery_fee</th></tr></thead><tbody><tr><td>5000026</td><td>100253</td><td>RUH-04</td><td>delivered</td><td>9.00</td></tr><tr><td>5000422</td><td>100694</td><td>JED-03</td><td>delivered</td><td>9.00</td></tr></tbody></table><div class="mt"><table class="t small"><thead><tr><th>raw.stores.store_id</th><th>city</th></tr></thead><tbody><tr><td>RUH-04</td><td>Riyadh</td></tr><tr><td>JED-03</td><td>Jeddah</td></tr></tbody></table></div><p class="small mt">The same IDs and column names appear in your notebooks.<br/>We report sales by <b>store city</b>. All amounts are in SAR.</p><aside class="notes">These are actual records from the local Qafila source database. Other orders columns include payment_method, promo_code, created_at, and updated_at. The raw schema comes from Lab 1.1. raw is the warehouse schema for these source tables. In the SQLite file the tables have no raw prefix.</aside></section>
+
+<section class="slide"><div class="kicker">The same Qafila data</div><h2>The order lines keep their source columns</h2><h3>raw.order_items · all source columns</h3><table class="t small"><thead><tr><th>order_id</th><th>line_no</th><th>product_id</th><th>quantity</th><th>unit_price</th><th>discount</th></tr></thead><tbody><tr><td>5000026</td><td>1</td><td>1149</td><td>1</td><td>33.46</td><td>0.00</td></tr><tr><td>5000026</td><td>2</td><td>1207</td><td>2</td><td>121.20</td><td>0.00</td></tr><tr><td>5000422</td><td>1</td><td>1149</td><td>1</td><td>33.65</td><td>0.00</td></tr></tbody></table><div class="mt"><table class="t small"><thead><tr><th>raw.products.product_id</th><th>name_en</th><th>category</th></tr></thead><tbody><tr><td>1149</td><td>Al Waha Chicken Breast</td><td>Meat &amp; Poultry</td></tr><tr><td>1207</td><td>Al Waha Ajwa Dates Family Size</td><td>Dates &amp; Coffee</td></tr></tbody></table></div><div class="callout tip mt small"><b>Why this matters:</b> Product names stay in products. The order line records the quantity and the price actually charged.</div><aside class="notes">All shown order_items and products values come from the course database. products.unit_price is a current listing value and can differ from the price on an order line. Use order_items.unit_price for historical sales. The pair order_id and line_no is the source primary key. net_amount is derived later, not an extra raw column.</aside></section>
+
+<section class="slide"><div class="kicker">Step 1 · Define the business process</div><h2>The business question determines the calculation</h2><p class="lead">How much product revenue came from Riyadh stores?</p><ol class="bullets small"><li>Find Riyadh in <code>raw.stores.city</code>.</li><li>Match <code>store_id</code> to delivered <code>raw.orders</code>.</li><li>Match <code>order_id</code> to <code>raw.order_items</code>.</li><li>Add <code>quantity × unit_price − discount</code>.</li></ol><p class="lead mt">Order 5000026: 33.46 + 2 × 121.20 = <b>275.86 SAR</b></p><aside class="notes">This is the same join path and store-city definition used in Lab 2.2. The 275.86 SAR result covers the selected Riyadh order only, not all Riyadh sales. Customer city and store city are different attributes even when they happen to agree for these rows.</aside></section>
+
+<section class="slide">
+<div class="kicker">Step 2 · Choose the grain</div>
+<h2>Grain means exactly what one row represents</h2>
+<table class="t small"><thead><tr><th>Possible table</th><th>One row represents</th><th>How order 5000026 appears</th></tr></thead><tbody><tr><td>Order fact</td><td>One order</td><td>One row</td></tr><tr><td>Order-line fact</td><td>One numbered line within an order</td><td>Two rows</td></tr><tr><td>Daily store sales</td><td>One store on one business date</td><td>Part of a daily total</td></tr></tbody></table><div class="callout tip mt small"><b>Why this matters:</b> The grain determines which keys identify a row and which amounts belong on it.</div>
+<aside class="notes">Ask learners to finish: one row per what? “Sales data” and “one transaction” are often too vague. Two lines may contain the same product, so order_id plus product_id is not necessarily unique. Choose order-line grain to retain detail for product analysis.</aside>
+</section>
+
+<section class="slide"><div class="kicker">Step 2 · Test the claim</div><h2>Our fact has one row per order line</h2><table class="t small"><thead><tr><th>order_id</th><th>line_no</th><th>product_id</th><th>quantity</th><th>unit_price</th><th>net_amount</th></tr></thead><tbody><tr><td>5000026</td><td>1</td><td>1149</td><td>1</td><td>33.46</td><td>33.46</td></tr><tr><td>5000026</td><td>2</td><td>1207</td><td>2</td><td>121.20</td><td>242.40</td></tr><tr><td>5000422</td><td>1</td><td>1149</td><td>1</td><td>33.65</td><td>33.65</td></tr></tbody></table><pre class="code s" data-file="Lab 2.2 · expected result: zero rows"><code class="language-sql">SELECT order_id, line_no, COUNT(*) AS copies
+FROM star.fct_order_items
+GROUP BY order_id, line_no
+HAVING COUNT(*) &gt; 1;</code></pre><div class="callout tip mt small"><b>Calculation:</b> net_amount = quantity × unit_price − discount.</div><aside class="notes">The product_id column identifies what each line contains. It shows the source product ID for clarity. Lab 2.2 retrieves that ID through dim_product using the fact’s product_key; the dbt fact stores product_id directly. The source rows have zero discounts. Their net amounts total 309.51 SAR. Test non-null key columns as well as uniqueness. Unit prices can vary between orders for the same product. They should not be summed as a sales metric.</aside></section>
+
+<section class="slide">
+<div class="kicker">Step 3 · Choose the measurements</div>
+<h2>Each measure has a natural grain</h2>
+<table class="t small"><thead><tr><th>Value</th><th>At order-line grain?</th><th>Reason</th></tr></thead><tbody><tr><td>Quantity and line discount</td><td>Yes</td><td>Each line has its own amount</td></tr><tr><td>Line net amount</td><td>Yes</td><td>quantity × unit_price − discount</td></tr><tr><td>Unit price</td><td>Recorded per line</td><td>Multiply by quantity, do not sum prices</td></tr><tr><td>Delivery fee</td><td>Order grain</td><td>The order pays this fee once</td></tr></tbody></table><div class="callout tip mt small"><b>Why this matters:</b> We can keep <code>net_amount</code> in <code>fct_order_items</code> and <code>delivery_fee</code> in <code>fct_orders</code>.</div>
+<aside class="notes">An allocation rule can distribute an order fee over lines, for example proportionally to line value. That is an explicit business decision requiring checks that allocated fees sum to the original fee. Copying the full fee onto each line does not allocate it.</aside>
+</section>
+
+<section class="slide"><div class="kicker">Step 4 · Add descriptive context</div><h2>Dimensions reuse the product information we have</h2><h3>star.dim_product · selected columns</h3><table class="t small"><thead><tr><th>product_key</th><th>product_id</th><th>name_en</th><th>category</th></tr></thead><tbody><tr><td>149</td><td>1149</td><td>Al Waha Chicken Breast</td><td>Meat &amp; Poultry</td></tr><tr><td>207</td><td>1207</td><td>Al Waha Ajwa Dates Family Size</td><td>Dates &amp; Coffee</td></tr></tbody></table><p class="small mt"><code>product_id</code>, <code>name_en</code>, and <code>category</code> already exist in <code>raw.products</code>.<br/>Lab 2.2 adds <code>product_key</code> to identify the dimension row.</p><aside class="notes">Lab 2.2 assigns product_key with row_number ordered by product_id. For this generated dataset product_id 1149 maps to 149 and 1207 maps to 207. These are rebuild-specific warehouse mappings, not an arithmetic transformation to assume in production. The dbt project uses the source product_id directly in its Type 1 dimension.</aside></section>
+
+<section class="slide"><div class="kicker">Step 5 · Answer a business question</div><h2>One join turns line amounts into category sales</h2><div class="cols cols-2"><div><pre class="code s" data-file="Lab 2.2 · the same two orders"><code class="language-sql">SELECT p.category, SUM(f.net_amount) AS revenue
+FROM star.fct_order_items f
+JOIN star.dim_product p
+  ON f.product_key = p.product_key
+WHERE f.order_status = 'delivered'
+  AND f.order_id IN (5000026, 5000422)
+GROUP BY p.category;</code></pre></div><div><h3>Expected result</h3><table class="t small"><thead><tr><th>category</th><th>revenue SAR</th></tr></thead><tbody><tr><td>Meat &amp; Poultry</td><td>67.11</td></tr><tr><td>Dates &amp; Coffee</td><td>242.40</td></tr></tbody></table><p class="small mt">Chicken: 33.46 + 33.65<br/>Dates: 2 × 121.20</p></div></div><aside class="notes">The order_id filter restricts the query to the running example so the displayed results are reproducible in the full dataset. Product key joins match one dimension row per line. Source descriptions have moved to a dimension, while the meaning of the source IDs and line amounts stays the same.</aside></section>
+
+<section class="slide">
+<div class="kicker">Three fact types</div>
+<h2>Fact types describe different kinds of rows</h2>
+<table class="t small"><thead><tr><th>Fact type</th><th>One row represents</th><th>What happens over time</th></tr></thead><tbody><tr><td>Transaction</td><td>One sale, payment, or refund event</td><td>New events add rows</td></tr><tr><td>Periodic snapshot</td><td>One product in one store on one date</td><td>Each reporting period adds observations</td></tr><tr><td>Accumulating snapshot</td><td>One order moving through fulfillment</td><td>The row gains milestone timestamps</td></tr></tbody></table>
+<aside class="notes">Do not infer additivity solely from fact-table type. Transaction amounts may be additive across disjoint events. Snapshot balances are often semi-additive. Accumulating facts can contain counts, durations, and amounts with different valid aggregations.</aside>
+</section>
+
+<section class="slide">
+<div class="kicker">Which aggregations make sense?</div>
+<h2>Inventory across days cannot be added as sales can</h2>
+<p class="small"><b>Same product_id: 1149</b> (Chicken breast) &nbsp; <b>Same store_id: RUH-04</b> (Riyadh)</p>
+<div class="cols cols-32"><div><h3>Distinct sales lines</h3><table class="t small"><thead><tr><th>order_id</th><th>line_no</th><th>product_id</th><th>order_date</th><th>net_amount</th></tr></thead><tbody><tr><td>5000026</td><td>1</td><td>1149</td><td>Aug 1</td><td>33.46</td></tr><tr><td>5001390</td><td>2</td><td>1149</td><td>Aug 3</td><td>59.58</td></tr><tr><td>5001904</td><td>4</td><td>1149</td><td>Aug 4</td><td>132.28</td></tr></tbody></table><p class="small mt">Each (order_id, line_no) identifies a different sale.<br>Total = 33.46 + 59.58 + 132.28 = <b>225.32 SAR</b></p></div><div><h3>Repeated stock observations</h3><table class="t small"><thead><tr><th>product_id</th><th>date_day</th><th>stock_on_hand</th></tr></thead><tbody><tr><td>1149</td><td>Aug 1</td><td>100</td></tr><tr><td>1149</td><td>Aug 3</td><td>80</td></tr><tr><td>1149</td><td>Aug 4</td><td>60</td></tr></tbody></table><p class="small mt">Same product and store, observed on different dates.<br>Stock on Aug 4 = <b>60 units</b>, not 240.<br><span class="muted">Illustrative stock values.</span></p></div></div>
+
+<aside class="notes">The three sales lines are actual delivered records for product_id 1149 and store_id RUH-04 in qafila_oltp.sqlite. order_date is the Riyadh business date. net_amount = quantity * unit_price - discount. Their total is 225.32 SAR. The stock numbers are hypothetical observations for those same existing IDs, not a claim that the source database contains an inventory table. A periodic snapshot grain would be (product_id, store_id, date_day). Sales line grain is (order_id, line_no). Inventory is semi-additive: compatible stock can be summed across stores on one date, but not across successive observations.</aside>
+</section>
+
+<section class="slide">
+<div class="kicker">A process that changes over time</div>
+<h2>An accumulating snapshot follows one order</h2>
+<table class="t small"><thead><tr><th>State of order 5000026</th><th>created_at_utc</th><th>assigned_at_utc</th><th>delivered_at_utc</th></tr></thead><tbody><tr><td>When placed</td><td>10:00</td><td>NULL</td><td>NULL</td></tr><tr><td>When assigned</td><td>10:00</td><td>10:05</td><td>NULL</td></tr><tr><td>When delivered</td><td>10:00</td><td>10:05</td><td>10:50</td></tr></tbody></table><p class="small mt">These are three versions of the <b>same row</b>, not three sales.<br/>Delivery duration = 10:50 − 10:00 = <b>50 minutes</b>.</p>
+<aside class="notes">The milestone progression is hypothetical for the same Qafila order. created_at_utc comes from stg_orders. assigned_at_utc and delivered_at_utc come from int_delivery_timeline. For multiple orders, a mean or percentile delivery duration may be useful. Summing durations answers a different question. Repeated fulfillment stages or reopened orders may need an event fact as well.</aside>
+</section>
+
+<section class="slide"><div class="kicker">Keys · The extra identifier</div><h2>One customer keeps its familiar source ID</h2><table class="t small"><thead><tr><th>customer_key · added in Lab 2.2</th><th>customer_id · from raw.customers</th><th>city · from raw.customers</th></tr></thead><tbody><tr><td>243</td><td>100253</td><td>Riyadh</td></tr><tr><td>675</td><td>100694</td><td>Jeddah</td></tr></tbody></table><ul class="bullets small"><li><b>Natural (source) key:</b> <code>customer_id</code> is the ID you already used in orders.</li><li><b>Surrogate key:</b> <code>customer_key</code> identifies a warehouse dimension row.</li><li>The dimension retains both IDs so we can look up the mapping.</li></ul><aside class="notes">The keys shown match the full-rebuild row_number mappings in Lab 2.2 for this dataset. Warehouse keys should be stable in a production load. SCD2 can use a different surrogate for each version of the same customer. Source-system collisions are another use, but do not introduce a second source system to this exercise.</aside></section>
+
+<section class="slide"><div class="kicker">Keys · A connection to Day 1</div><h2>The same customer can have two historical versions</h2><p class="small">Suppose customer <b>100253</b> moves city. This is an extension of the example.</p><table class="t small"><thead><tr><th>customer_key</th><th>customer_id</th><th>city</th><th>valid_from</th><th>valid_to</th></tr></thead><tbody><tr><td>243</td><td>100253</td><td>Riyadh</td><td>Aug 1</td><td>Sep 1</td></tr><tr><td>9001</td><td>100253</td><td>Jeddah</td><td>Sep 1</td><td>NULL</td></tr></tbody></table><table class="t small"><thead><tr><th>Order time</th><th>Assigned customer_key</th><th>Historical city</th></tr></thead><tbody><tr><td>Aug 20</td><td>243</td><td>Riyadh</td></tr><tr><td>Sep 10</td><td>9001</td><td>Jeddah</td></tr></tbody></table><div class="callout tip mt small"><b>Why this matters:</b> The familiar customer_id stays the same. A version key tells us which city applied when the order happened.</div><aside class="notes">This move and key 9001 are hypothetical, not claimed source records. Day 1 uses dim_customer_scd2 with customer_id, valid_from, valid_to, and is_current. It uses an as-of join on source ID plus time. This slide illustrates adding version surrogates to that same history. Lab 2.2 builds current attributes instead. Use half-open validity intervals and ensure versions do not overlap.</aside></section>
+
+<section class="slide"><div class="kicker">Keys · The unknown member</div><h2>A missing customer should not erase an order</h2><div class="cols cols-2"><div><h3>star.dim_customer</h3><table class="t small"><thead><tr><th>customer_key</th><th>customer_id</th><th>city</th></tr></thead><tbody><tr><td>-1</td><td>-1</td><td>Unknown</td></tr><tr><td>243</td><td>100253</td><td>Riyadh</td></tr></tbody></table><p class="small mt">Add the Unknown row before loading facts.</p></div><div><pre class="code s" data-file="Lab 2.2 · Type 1 lookup"><code class="language-sql">SELECT o.order_id,
+       COALESCE(c.customer_key, -1) AS customer_key
+FROM wh.raw.orders o
+LEFT JOIN star.dim_customer c
+  ON o.customer_id = c.customer_id;</code></pre></div></div><div class="callout tip mt small"><b>Why this matters:</b> The LEFT JOIN keeps the order. The fallback key gives it a valid dimension reference.</div><aside class="notes">This is the Lab 2.2 naming and lookup pattern. Customer 100253 exists and maps to 243. Other orders with missing customers map to -1. Do not claim that the selected example customer is missing. SCD2 requires an event-time condition in addition to source ID.</aside></section>
+
+<section class="slide"><div class="kicker">The fan-out trap · See the rows</div><h2>Fan-out begins with a perfectly valid join</h2><table class="t small"><thead><tr><th>order_id</th><th>line_no</th><th>net_amount</th><th>delivery_fee · repeated by join</th></tr></thead><tbody><tr><td>5000026</td><td>1</td><td>33.46</td><td>9.00</td></tr><tr><td>5000026</td><td>2</td><td>242.40</td><td>9.00</td></tr><tr><td>5000422</td><td>1</td><td>33.65</td><td>9.00</td></tr></tbody></table><p class="lead mt">Order 5000026 has two lines and one 9 SAR fee.</p><div class="callout tip mt small"><b>Why this matters:</b> The join repeats that order-level fee on both lines. Summing it would count the fee twice.</div><aside class="notes">The source delivery_fee is 9 SAR for each selected order. The repeated fee is a consequence of joining order grain to line grain. Ask learners to add the three line amounts, then the two source fees.</aside></section>
+
+<section class="slide"><div class="kicker">The fan-out trap · Work out the error</div><h2>The repeated fee adds an extra 9 SAR</h2><div class="cols cols-2"><div><h3>Correct total</h3><p class="small">Items: 33.46 + 242.40 + 33.65 = 309.51</p><p class="small">Fees: 9 + 9 = 18</p><p class="lead"><b>327.51 SAR</b></p></div><div><h3>After the naive join</h3><p class="small">Items: 309.51</p><p class="small">Repeated fees: 9 + 9 + 9 = 27</p><p class="lead"><b>336.51 SAR</b></p></div></div><pre class="code s" data-file="The calculation that repeats the fee"><code class="language-sql">SELECT SUM(f.net_amount + o.delivery_fee)
+FROM star.fct_order_items f
+JOIN wh.raw.orders o USING (order_id)
+WHERE f.order_id IN (5000026, 5000422);</code></pre><aside class="notes">The difference is exactly 9 SAR. Both selected orders are delivered. SUM(DISTINCT delivery_fee) is demonstrably wrong here as well: both orders legitimately have the same 9 SAR fee, so DISTINCT would retain only 9 rather than 18.</aside></section>
+
+<section class="slide"><div class="kicker">The fan-out trap · Fix the grain</div><h2>A shared grain makes the calculation safe</h2><pre class="code s" data-file="Lab 2.2 · aggregate the same lines to order grain first"><code class="language-sql">WITH item_totals AS (
+  SELECT order_id, SUM(net_amount) AS items_amount
+  FROM star.fct_order_items
+  GROUP BY order_id
+)
+SELECT o.order_id, i.items_amount, o.delivery_fee,
+       i.items_amount + o.delivery_fee AS total
+FROM wh.raw.orders o
+LEFT JOIN item_totals i USING (order_id)
+WHERE o.order_id IN (5000026, 5000422);</code></pre><table class="t small"><thead><tr><th>order_id</th><th>items_amount</th><th>delivery_fee</th><th>total SAR</th></tr></thead><tbody><tr><td>5000026</td><td>275.86</td><td>9.00</td><td>284.86</td></tr><tr><td>5000422</td><td>33.65</td><td>9.00</td><td>42.65</td></tr></tbody></table><aside class="notes">Both selected orders have lines. Their totals add to 327.51 SAR. For a broader report decide explicitly how to treat an order without valid lines. The purpose of this example is to make both sides of the join one row per order, exactly as the supplied dbt fct_orders model does with its lines CTE.</aside></section>
+
+<section class="slide">
+<div class="kicker">Before trusting the model</div>
+<h2>A reconciliation checks rows as well as money</h2>
+<table class="t small"><thead><tr><th>Check</th><th>Expected in our example</th><th>What a mismatch can reveal</th></tr></thead><tbody><tr><td>Fact row count</td><td>3 source lines = 3 fact lines</td><td>A dropped row or multiplying join</td></tr><tr><td>Fact key uniqueness</td><td>No repeated (order_id, line_no)</td><td>A grain violation</td></tr><tr><td>Line net total</td><td>309.51 SAR in source and fact</td><td>A filter, calculation, or join difference</td></tr><tr><td>Rows assigned to Unknown</td><td>Explain and monitor them</td><td>Missing source references</td></tr></tbody></table><div class="callout tip mt small"><b>Why this matters:</b> Use the same time range, status rules, and quantity rules on both sides of the comparison.</div>
+<aside class="notes">Counts and totals are complementary: equal counts can hide one dropped and one duplicated row, while equal totals can hide offsetting errors. Lab 2.2 retains all quantities for the modeling exercise. The dbt mart filters quantity &gt; 0 and quarantines non-positive quantities. Reconcile that curated mart against the correspondingly filtered source, not all raw rows.</aside>
+</section>
+
+<section class="slide">
+<div class="kicker">Using the star for another question</div>
+<h2>The date dimension supports daily comparisons</h2>
+<pre class="code s" data-file="Lab 2.2: compare average daily revenue"><code class="language-sql">WITH daily AS (
+  SELECT d.date_day, d.is_weekend, s.city,
+         SUM(f.net_amount) AS revenue
+  FROM star.fct_order_items f
+  JOIN star.dim_date d USING (date_key)
+  JOIN star.dim_store s USING (store_key)
+  WHERE f.order_status = 'delivered'
+  GROUP BY d.date_day, d.is_weekend, s.city
+)
+SELECT city, is_weekend, AVG(revenue) AS avg_daily_revenue
+FROM daily GROUP BY city, is_weekend;</code></pre><div class="callout tip mt small"><b>Why this matters:</b> First total each day. Then average those daily totals, so days with more order lines do not get extra weight.</div>
+<aside class="notes">The lab defines Friday and Saturday as the weekend and flags September 23 for its National Day comparison. The query averages observed sales days. If a city has zero-sales days, build a complete calendar-by-city set and fill those daily totals with zero before averaging. Lab dim_store city is store city.</aside>
+</section>
+
+<section class="slide">
+<div class="kicker">Other choices</div>
+<h2>Other modeling styles change the tradeoffs</h2>
+<table class="t small"><thead><tr><th>Style</th><th>How it organizes data</th><th>Tradeoff</th></tr></thead><tbody><tr><td>Star</td><td>Facts connect to descriptive dimensions</td><td>Reusable analytical structure, requires grain discipline</td></tr><tr><td>Snowflake</td><td>Some dimensions refer to other dimensions</td><td>Less repeated hierarchy data, more joins</td></tr><tr><td>One big table</td><td>Prejoin measures and descriptions</td><td>Convenient for a workload, repeats attributes</td></tr><tr><td>Data Vault</td><td>Separate business keys, relationships, and history</td><td>Integration and traceability, often needs serving marts</td></tr></tbody></table><p class="small mt">The labs use a star. The optional stretch compares it with a wide table.</p>
+<aside class="notes">These are modeling patterns, not a ranking by speed. An OBT can sit on a star for a particular consumer. Historical attribute changes require an explicit refresh or versioning strategy. Data Vault often supports integration upstream of dimensional marts.</aside>
+</section>
+
+<section class="slide quiz">
+<div class="kicker">Checkpoint</div>
+<h2>An order has three lines and one 9 SAR fee. What happens if we sum that fee after joining to the lines?</h2>
+<div class="opts"><div class="opt" data-k="A">The fee contributes 9 SAR</div><div class="opt" data-k="B" data-ok="">The fee contributes 27 SAR</div><div class="opt" data-k="C">The fee disappears</div></div><div class="why callout tip small"><b>B.</b> The join produces three matching rows. Summing the repeated fee counts 9 SAR three times. Aggregate to order grain before combining measures.</div>
+<aside class="notes">Pause before revealing the answer. Ask learners to explain the consequence of each choice.</aside>
+</section>
+
+<section class="slide lab top"><div class="cols cols-2"><div><div class="lab-tag">Lab 2.2 · 25 min</div><h2>A star schema for Qafila</h2><a class="nb" href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_2_dimensional_modeling.ipynb" rel="noopener" target="_blank">labs/D2_2_dimensional_modeling.ipynb ↗</a><p class="small mt">State the grain, build the model, then prove that its rows and amounts agree with the source.</p></div><ul class="checklist"><li>Declare and test order-line grain <span class="min">4′</span></li><li>Build four dimensions and Unknown <span class="min">7′</span></li><li>Build the fact and reconcile <span class="min">6′</span></li><li>Compare daily sales using dimensions <span class="min">5′</span></li><li>Reproduce and fix fee fan-out <span class="min">3′</span></li></ul></div><aside class="notes">Use the notebook table names and schema star. The notebook creates singular dimensions with surrogate keys and current customer attributes. It intentionally keeps all order lines for the first reconciliation. The next lab’s dbt project uses plural dimension names and source IDs for its Type 1 dimensions. Do not imply that Lab 2.3 implements SCD2.</aside></section>
+
+<section class="slide break" data-label="Break"><div class="kicker">Break</div><h1>20-minute break</h1><div class="timer" data-minutes="20"></div><p class="lead">Next: Session 3 · dbt</p></section>
+
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="../assets/deck/logo.js"></script>
+<script src="../assets/deck/deck.js"></script>
+</body>
+</html>

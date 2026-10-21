@@ -1998,6 +1998,20 @@ def _dbt_graph(project_dir):
     for n in nodes.values():
         n["parents"] = [p for p in n["parents"] if p in nodes]
 
+    depth = _depths(nodes)
+    tests = {}
+    for uid, n in m["nodes"].items():
+        if n["resource_type"] != "test":
+            continue
+        parents = [p for p in n["depends_on"]["nodes"] if p in nodes]
+        host = n.get("attached_node") or max(parents, key=lambda p: depth[p])
+        meta = n.get("test_metadata") or {}
+        tests[uid] = dict(name=n["name"], short=meta.get("name", "custom"), column=n.get("column_name"), host=host)
+    return _layered(nodes, tests, depth)
+
+
+def _depths(nodes):
+    """Column of each node: one more than its deepest parent."""
     depth = {}
 
     def d(uid):
@@ -2007,15 +2021,11 @@ def _dbt_graph(project_dir):
 
     for uid in nodes:
         d(uid)
-    tests = {}
-    for uid, n in m["nodes"].items():
-        if n["resource_type"] != "test":
-            continue
-        parents = [p for p in n["depends_on"]["nodes"] if p in nodes]
-        host = n.get("attached_node") or max(parents, key=lambda p: depth[p])
-        meta = n.get("test_metadata") or {}
-        tests[uid] = dict(name=n["name"], short=meta.get("name", "custom"), column=n.get("column_name"), host=host)
+    return depth
 
+
+def _layered(nodes, tests, depth):
+    """Layered layout (in pixels) of a graph: `nodes` {id: name, sub, parents}, `tests` {id: short, host}."""
     # columns by depth; inside a column, order by the mean position of the parents
     cols, row = [], {}
     for k in range(max(depth.values()) + 1):
@@ -2295,6 +2305,225 @@ def dbt_graph(project_dir, title=None):
     n_models = sum(n["kind"] != "source" for n in nodes.values())
     fig.text(0.01, 1 - 0.08 / fig_h, ha="left", va="top", fontsize=10.5, weight="bold", s=title or f"The project's graph: {len(nodes) - n_models} sources → {n_models} models, "
                  f"{len(g['tests'])} tests (pills).\nBox = materialization: dashed = view, navy = table, purple = incremental")
+
+
+# ---------------------------------------------------------------------------
+# Dagster · the asset graph, and one run replayed on it
+# ---------------------------------------------------------------------------
+
+def _asset_graph(defs, collapse=False):
+    """Assets, checks and a layered layout of Dagster definitions (assets, multi-assets and asset checks).
+
+    `collapse=True` draws one pill per asset ("4 checks") instead of one per check, for big static graphs."""
+    import dagster as dg
+
+    check_defs = [a for a in defs if isinstance(a, dg.AssetChecksDefinition)]
+    asset_defs = [a for a in defs if not isinstance(a, dg.AssetChecksDefinition)]
+    needed = {k for a in defs for k in a.required_resource_keys} - {"io_manager"}   # the graph, not the resources
+    graph = dg.Definitions(assets=asset_defs, asset_checks=check_defs,
+                           resources={k: dg.ResourceDefinition.none_resource() for k in needed}).resolve_asset_graph()
+    blocking = {spec.key: spec.blocking for a in defs for spec in a.check_specs}
+    nodes, tests = {}, {}
+    for key in graph.get_all_asset_keys():
+        n = graph.get(key)
+        sub = [] if n.group_name == "default" else [n.group_name]
+        if n.partitions_def is not None:
+            sub.append(type(n.partitions_def).__name__.replace("PartitionsDefinition", "").lower() + " partitions")
+        sub += sorted(n.kinds)
+        if not n.is_materializable:
+            sub = ["external: not built here"]
+        nodes[key] = dict(name=key.to_user_string(), kind="asset" if n.is_materializable else "source",
+                          sub=" · ".join(sub) or "asset", parents=sorted(n.parent_keys, key=str))
+        for ck in sorted(n.check_keys, key=lambda c: c.name):
+            cut = ck.name.find("_" + key.path[-1])          # dbt test names: not_null_stg_orders_order_id
+            tests[ck] = dict(name=ck.name, short=ck.name[:cut] if cut > 0 else ck.name, column=None, host=key,
+                             blocking=blocking.get(ck, False))
+    for n in nodes.values():
+        n["parents"] = [p for p in n["parents"] if p in nodes]
+    counts = dict(n_checks=len(tests), n_block=sum(t["blocking"] for t in tests.values()), collapsed=collapse)
+    if collapse:
+        hosts = {}
+        for t in tests.values():
+            hosts.setdefault(t["host"], []).append(t)
+        tests = {("checks", h): dict(name=", ".join(t["name"] for t in ts), short=f"{len(ts)} check{'s' * (len(ts) > 1)}",
+                                     column=None, host=h, blocking=all(t["blocking"] for t in ts))
+                 for h, ts in hosts.items()}
+    g = _layered(nodes, tests, _depths(nodes))
+    steps = {}                                               # step key (the op's name) -> the assets and checks it makes
+    for a in defs:
+        steps[a.node_def.name] = set(a.keys) | set(a.check_keys)
+    return g | counts | dict(tests=tests, steps=steps, graph=graph)
+
+
+def asset_run(defs, result=None, selection=None, speed_ms=1500):
+    """Dagster assets as a graph and, given the result of `dg.materialize`, that run replayed event by event.
+
+    `defs` is what was passed to `materialize` (assets, multi-assets such as dbt's, asset checks). `selection` is the
+    `AssetSelection` or list of assets the run was asked for (default: all of them). Every step of the player is one
+    event of the run's log (`result.all_events`): materializations, check results, failures and retries.
+    """
+    import html
+
+    import dagster as dg
+
+    g = _asset_graph(defs, collapse=result is None and selection is None)
+    nodes, tests, pos, box_h = g["nodes"], g["tests"], g["pos"], g["box_h"]
+    ids = {u: f"n{i}" for i, u in enumerate(nodes)} | {u: f"t{i}" for i, u in enumerate(tests)}
+
+    svg, edges = [], []
+    for p, u, pts in g["edges"]:
+        k = f"e{len(edges)}"
+        edges.append((k, p, u))
+        svg.append(f'<path data-k="{k}" class="e" marker-end="url(#ah-%%ID%%)" d="{_edge_path(pts)}"/>')
+    for u, n in nodes.items():
+        x, y, w = pos[u]
+        svg.append(f'<g data-k="{ids[u]}" class="n{" src" if n["kind"] == "source" else ""}">'
+                   f'<rect x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{box_h}" rx="6"/>'
+                   f'<text class="nm" x="{x + 10:.0f}" y="{y + 17:.0f}">{html.escape(n["name"])}</text>'
+                   f'<text class="sb" x="{x + 10:.0f}" y="{y + 32:.0f}">{html.escape(n["sub"])}</text></g>')
+        px = x
+        for t in n.get("tests", []):
+            tw = g["pill_w"](t)
+            uid = next(k for k, v in tests.items() if v is t)
+            svg.append(f'<g data-k="{ids[uid]}" class="p{" blk" if t["blocking"] else ""}">'
+                       f'<title>{html.escape(t["name"])}{" (blocking)" if t["blocking"] else ""}</title>'
+                       f'<rect x="{px:.0f}" y="{y + box_h + 5:.0f}" width="{tw:.0f}" height="16" rx="8"/>'
+                       f'<text x="{px + tw / 2:.0f}" y="{y + box_h + 16.5:.0f}" text-anchor="middle">'
+                       f'{html.escape(t["short"])}</text></g>')
+            px += tw + 4
+    body = (f'<svg width="{g["width"]:.0f}" height="{g["height"]:.0f}" style="display:block">'
+            f'<defs><marker id="ah-%%ID%%" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" '
+            f'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="{MUTED}"/></marker></defs>'
+            + "".join(svg) + "</svg>")
+    css = _DAG_CSS + "#%%ID%% .p.blk rect {stroke-width: 2.4}\n"
+
+    def many(n, word):
+        return f"{n} {word}{'' if n == 1 else 's'}"
+
+    def meta_text(metadata):
+        """Metadata for a caption: ids and dbt's bookkeeping left out, numbers shortened."""
+        out = []
+        for k, v in metadata.items():
+            if k in ("unique_id", "invocation_id") or k.startswith("dagster"):
+                continue
+            v = v.value
+            out.append(f"{k} = " + (f"{v:.2f}" if isinstance(v, float) else f"{v:,}" if isinstance(v, int) else str(v)))
+        return html.escape(", ".join(out))
+
+    n_assets = sum(n["kind"] == "asset" for n in nodes.values())
+    first = (f"The graph Dagster built from the code: {many(n_assets, 'asset')}"
+             + (f", {many(g['n_checks'], 'check')} ("
+                + ("one pill per asset, thick when all its checks are blocking; " if g["collapsed"] else "the pills; ")
+                + f"{g['n_block']} blocking)" if g["n_checks"] else "")
+             + ". Every arrow is a dependency it read from a function's arguments or its <code>deps</code>, "
+             "before running anything.")
+    steps = [dict(state={}, caption=first)]
+    if result is None and selection is None:
+        return _stepper(body, steps, css=css, key="", speed_ms=speed_ms)
+
+    if selection is None:
+        chosen = {u for u, n in nodes.items() if n["kind"] == "asset"}
+    elif isinstance(selection, dg.AssetSelection):
+        chosen = set(selection.resolve(g["graph"]))
+    else:
+        chosen = {k for a in selection for k in a.keys}
+    chosen_checks = {c for c, t in tests.items() if t["host"] in chosen}
+    sel = {ids[u]: ("sel" if u in chosen else "unsel") for u, n in nodes.items() if n["kind"] == "asset"}
+    sel |= {ids[c]: ("sel" if c in chosen_checks else "unsel") for c in tests}
+    sel |= {k: ("sel" if c in chosen else "unsel") for k, p, c in edges}
+    part = result.dagster_run.tags.get("dagster/partition") if result is not None else None
+    steps.append(dict(state=dict(sel), caption=(
+        f"This run asks for {len(chosen)} of {many(n_assets, 'asset')} (outlined)"
+        + (f", for the partition <b>{html.escape(part)}</b>" if part else "")
+        + ". Dagster starts a step once all its parents are done, so the order follows the arrows.")))
+    if result is None:
+        return _stepper(body, steps, css=css, key="", speed_ms=speed_ms)
+
+    def error_line(err):
+        while err is not None and err.cause is not None:
+            err = err.cause
+        return html.escape(((err.message if err else "") or "").strip().splitlines()[-1][:200])
+
+    done, failed_block, retries = {}, False, {}
+    count = {"ok": 0, "fail": 0, "skip": 0}
+    events = [e for e in result.all_events if e.event_type_value in
+              ("ASSET_MATERIALIZATION", "ASSET_CHECK_EVALUATION", "STEP_FAILURE", "STEP_UP_FOR_RETRY")]
+    for e in events:
+        t, data = e.event_type_value, e.event_specific_data
+        if t == "ASSET_MATERIALIZATION":
+            u = e.asset_key
+            meta = meta_text(data.materialization.metadata)
+            done[ids[u]] = "sel ok"
+            count["ok"] += 1
+            text = f"<b>{html.escape(nodes[u]['name'])}</b> is materialized" + (f" · metadata: {meta}" if meta else "")
+            if u in retries:
+                text += f", on attempt {retries[u] + 1}"
+            cur = ids[u]
+        elif t == "ASSET_CHECK_EVALUATION":
+            ck = dg.AssetCheckKey(data.asset_key, data.check_name)
+            tst = tests[ck]
+            meta = meta_text(data.metadata)
+            done[ids[ck]] = "sel " + ("pass" if data.passed else "fail")
+            on = html.escape(nodes[tst["host"]]["name"])
+            if data.passed:
+                text = f"check <b>{html.escape(tst['name'])}</b> on <code>{on}</code> → <b>pass</b>"
+            else:
+                failed_block |= tst["blocking"]
+                text = (f"check <b>{html.escape(tst['name'])}</b> on <code>{on}</code> → <b>fail</b>"
+                        + (f" ({meta})" if meta else "") + ". "
+                        + ("It is <b>blocking</b>: nothing downstream of it runs in this run."
+                           if tst["blocking"] else
+                           f"It is not blocking: the failure is recorded, and the assets that read <code>{on}</code> "
+                           "still run, on data the check has just found wrong."))
+            if meta and data.passed:
+                text += f" ({meta})"
+            cur = ids[ck]
+        elif t == "STEP_UP_FOR_RETRY":
+            made = [u for u in g["steps"].get(e.step_key, ()) if u in nodes]
+            for u in made:
+                retries[u] = retries.get(u, 0) + 1
+            n_try = retries.get(made[0], 1) if made else 1
+            text = (f"<b>{html.escape(e.step_key)}</b> raised <code>{error_line(data.error)}</code>. Its retry policy "
+                    f"allows more attempts: Dagster waits and runs it again (retry {n_try}).")
+            cur = ids[made[0]] if made else None
+        else:
+            made = g["steps"].get(e.step_key, set())
+            assets_here = [u for u in made if u in nodes and ids[u] not in done]
+            if not assets_here:                              # a blocking check's step: already shown
+                continue
+            for u in assets_here:
+                done[ids[u]] = "sel fail"
+                count["fail"] += 1
+            text = (f"<b>{html.escape(', '.join(nodes[u]['name'] for u in assets_here))}</b> <b>failed</b>: "
+                    f"<code>{error_line(data.error)}</code>")
+            cur = ids[assets_here[0]]
+        state = sel | done
+        if cur:
+            state[cur] = state.get(cur, "") + " cur"
+        steps.append(dict(state=state, caption=f"{len(steps) - 1}/{len(events)} · {text}"))
+
+    skipped = [u for u in chosen if ids[u] not in done]
+    for u in skipped:
+        done[ids[u]] = "sel skip"
+        count["skip"] += 1
+    for c in chosen_checks:
+        done.setdefault(ids[c], "sel skip")
+    why = ("a blocking check upstream failed" if failed_block else "something upstream of them failed")
+    end = (f"Run {'succeeded' if result.success else 'failed'}: {count['ok']} materialized, {count['fail']} failed, "
+           f"{count['skip']} skipped")
+    if skipped:
+        end += (f" ({html.escape(', '.join(nodes[u]['name'] for u in sorted(skipped, key=str)))}: {why}; whatever "
+                "they hold is from their last run)")
+    end += (". Everything in this player came from the run's event log, <code>result.all_events</code>: the same "
+            "record the Dagster UI shows.")
+    steps.append(dict(state=sel | done, caption=end))
+    key = (f'<span style="background:#fff; border:1.5px solid {NAVY}"></span>asked for'
+           f'<span style="background:{NAVY}"></span>materialized'
+           f'<span style="background:{SERIES[0]}"></span>check passed'
+           f'<span style="background:{BAD}"></span>failed'
+           f'<span style="background:#f1efe9; border:1.5px dashed {MUTED}"></span>skipped'
+           f'<span style="background:#fff; border:3px solid {SERIES[3]}"></span>current')
+    return _stepper(body, steps, css=css, key=key, speed_ms=speed_ms)
 
 
 def animate_incremental(all_rows, candidates, before, key, cutoff, show=None, filter_col="updated_at", speed_ms=2000):
