@@ -287,3 +287,35 @@ print(plan.collect())
 # 2. Your daily load appends one small Parquet file per run, every 5 minutes. What happens after a year, and what's the fix?
 # 3. Which column would you sort Qafila's order lines by, and which would you partition by? Why not the same?
 # 4. When would you still deliver a CSV?
+#
+# ## 🖼️ Visual summary
+#
+# The pictures below are drawn from the files this lab wrote.
+#
+# **1 · Statistics only help when the data is sorted.** Each line is one row group's `[min, max]` of `created_at`, read
+# from the footer. The amber band is the one-day filter. The engine must read every row group whose line touches the
+# band: in the shuffled file that's all of them, in the sorted file one or two.
+
+# %%
+import de_viz as V
+
+ranges = {name: con.sql(f"""SELECT row_group_id, stats_min, stats_max FROM parquet_metadata('{O}/{name}.parquet')
+                            WHERE path_in_schema = 'created_at'""").df()
+          for name in ["unsorted", "sorted"]}
+V.row_group_ranges(ranges, DAY_FROM, DAY_TO)
+
+# %% [markdown]
+# **2 · Where the bytes go.** Compressed bytes per row, per column: repetitive columns (dictionary-encoded) are almost
+# free; unique IDs and precise numbers cost the most.
+
+# %%
+V.bars((col_bytes / n_rows).rename("bytes_per_row").reset_index(), "path_in_schema", ["bytes_per_row"],
+       titles=["compressed bytes per row (ZSTD Parquet)"], fmt="{:.2f}")
+
+# %% [markdown]
+# **3 · Format and layout.** Same rows, same answers. Left: CSV vs Parquet (Task 1). Right: one sorted file vs
+# partitioned by day vs over-partitioned by day and store (Task 5), for a full scan.
+
+# %%
+V.bars(results, "format", ["size_mb", "query_ms"], titles=["size (MB)", "revenue-by-city query (ms)"])
+V.bars(cost, "layout", ["files", "size_mb", "full_scan_ms"], titles=["files", "size (MB)", "full scan (ms)"])

@@ -9,6 +9,9 @@
 # The inputs: a snapshot of `customers` taken on **1 September 2026**, and every change made during September
 # (`data/raw/cdc/customers_changes.jsonl`), in the order the connector delivered them.
 #
+# This lab leans on window functions (`row_number`, `lead`, frames, `QUALIFY`). If they're new to you, do Lab 0
+# (`00_sql_windows.ipynb`) first.
+#
 # **Tasks**
 # - [ ] 1 · Read the feed; find duplicates and out-of-order events (4')
 # - [ ] 2 · Latest change per key; MERGE into a current-state table (7')
@@ -324,3 +327,49 @@ print("differences after 4 batches:", diff)
 # 2. Your MERGE runs twice on the same batch. What happens, and why is that fine?
 # 3. Which Qafila attributes deserve SCD2 history, and which are fine as Type 1 (overwrite)?
 # 4. An erasure request arrives. List every place in today's pipeline where that customer's data now lives.
+#
+# ## 🖼️ Visual summary
+#
+# The pictures below are drawn from this lab's feed and tables.
+#
+# **1 · Arrival order is not commit order.** Sixty events of the feed: each dot's position in the feed (x) against its
+# position in the database log (y). The grey line is the highest `lsn` delivered so far; every red ✕ below it arrived
+# after a newer event. The amber ring is a redelivery of an `lsn` already seen. In this feed, roughly half of all
+# events are out of order by a little: that's why only the log position can be trusted.
+
+# %%
+import de_viz as V
+
+arrivals = con.sql("""
+    SELECT arrival, lsn,
+           lsn < max(lsn) OVER (ORDER BY arrival ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS late,
+           row_number() OVER (PARTITION BY lsn ORDER BY arrival) > 1                              AS duplicate
+    FROM changes ORDER BY arrival
+""").df()
+first = int(arrivals[arrivals.duplicate].arrival.min()) - 30      # 60 arrivals around the first redelivery
+V.arrivals(arrivals, first=first, last=first + 60)
+
+# %% [markdown]
+# **2 · The SCD2 history, version by version.** Four customers who moved city in September and two who were erased,
+# as built in Task 4 (before the erasure `DELETE`). A version ends where the next one starts; a delete ends the last
+# version (✕) and starts nothing. Two neighbouring versions can show the same city: the change was to the district or
+# the mobile number. Versions from the 1 September snapshot started earlier; they're drawn from 25 August.
+
+# %%
+history = con.sql("""
+    SELECT customer_id, city, valid_from, lead(valid_from) OVER w AS valid_to
+    FROM versions
+    WINDOW w AS (PARTITION BY customer_id ORDER BY lsn)
+    QUALIFY NOT is_delete
+""").df()
+movers = con.sql("""
+    SELECT customer_id FROM versions WHERE NOT is_delete
+    GROUP BY customer_id HAVING count(DISTINCT city) > 2
+    ORDER BY count(*) DESC, customer_id LIMIT 4
+""").df().customer_id.tolist()
+erased_ids = con.sql("""
+    SELECT customer_id FROM versions GROUP BY customer_id HAVING bool_or(is_delete)
+    ORDER BY count(*) DESC, customer_id LIMIT 2
+""").df().customer_id.tolist()
+V.timelines([("Customers who moved, and customers who were erased", history[history.customer_id.isin(movers + erased_ids)])],
+            since="2026-08-25", until="2026-10-01")
