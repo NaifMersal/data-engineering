@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.10, <3.14"
 resolution-markers = [
     "python_full_version >= '3.13' and sys_platform == 'win32'",
@@ -2594,7 +2594,7 @@ requires-dist = [
     { name = "dagster", specifier = ">=1.10" },
     { name = "dagster-dbt", specifier = ">=0.26" },
     { name = "dbt-core", specifier = ">=1.10" },
-    { name = "dbt-duckdb", specifier = ">=1.9" },
+    { name = "dbt-duckdb", specifier = ">=1.11" },
     { name = "dlt", extras = ["duckdb"], specifier = ">=1.10" },
     { name = "duckdb", specifier = ">=1.4" },
     { name = "ipywidgets", specifier = ">=8.1" },

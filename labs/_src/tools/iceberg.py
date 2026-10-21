@@ -1,5 +1,5 @@
 # %% [markdown]
-# # Demo 3.1 · Open table formats, on a lightboard
+# # Iceberg · open table formats, on a lightboard
 #
 # Day 3 · Session 1 · instructor walkthrough, about 25 minutes. **No exercises:** we run every cell together and talk
 # about what comes out. You practise in **Lab 3.1** right after.
@@ -45,7 +45,7 @@ if IN_COLAB:
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", "requirements-colab.txt"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
-        os.chdir("..")  # demos/ notebooks run from labs/
+        os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/
 sys.path.insert(0, os.getcwd())
 
 import de_utils as U
@@ -65,7 +65,7 @@ from pyiceberg.transforms import DayTransform
 import de_viz as V
 
 pd.set_option("display.max_colwidth", 80)
-DEMO = U.lab_dir("D3_1_demo", reset=True)
+DEMO = U.lab_dir("tools_iceberg", reset=True)
 con = duckdb.connect()
 con.sql("SET enable_progress_bar = false")
 

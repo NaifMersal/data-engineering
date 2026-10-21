@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-<link rel="stylesheet" href="../assets/deck.css">
+<link rel="stylesheet" href="../assets/deck/deck.css">
 </head>
 <body>
 <div class="deck" data-day="Day 1" data-course="Modern Data Engineering">
@@ -180,7 +180,7 @@ uv run jupyter lab</code></pre>
 <section class="slide">
   <div class="kicker">Architectures</div>
   <h2>Warehouse, lake, lakehouse</h2>
-  <p class="xsmall"><a href="architecture-story.html">Open the Qafila architecture story: warehouse, lake, lakehouse</a></p>
+  <p class="xsmall"><a href="00_story.html">Open the Qafila architecture story: warehouse, lake, lakehouse</a></p>
   <div class="cols cols-3">
     <div class="card c-navy"><h4>Data warehouse</h4><p class="small">Managed SQL engine with its own storage format. Strong governance and performance.</p><p class="xsmall muted mb0">Snowflake, BigQuery, Redshift, Synapse</p></div>
     <div class="card c-teal"><h4>Data lake</h4><p class="small">Cheap object storage full of files (Parquet, JSON, CSV). Flexible, but "files are not tables": no transactions, no safe updates.</p><p class="xsmall muted mb0">S3, ADLS, GCS, HDFS, MinIO</p></div>
@@ -883,7 +883,7 @@ FROM orders o JOIN dim_customer_scd2 d
 
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script src="../assets/logo.js"></script>
-<script src="../assets/deck.js"></script>
+<script src="../assets/deck/logo.js"></script>
+<script src="../assets/deck/deck.js"></script>
 </body>
 </html>

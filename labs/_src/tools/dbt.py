@@ -1,5 +1,5 @@
 # %% [markdown]
-# # Lab 2.0 · dbt, from an empty folder to a tested report
+# # dbt, from an empty folder to a tested report
 #
 # Day 2, before Lab 2.3 · about 100 min · CPU only. You build a small dbt project file by file and read every piece of
 # SQL dbt generates from it, so nothing in Lab 2.3's big project is magic.
@@ -10,7 +10,7 @@
 # **Rhythm:** 🤔 predict → run → 🔍 read. The ▶ players replay what dbt just did, one step at a time.
 #
 # **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
-# then run the cell and the check after it (✅ = right). Answers: `solutions/D2_0_dbt_from_scratch.ipynb`.
+# then run the cell and the check after it (✅ = right). Answers: `solutions/tools/dbt.ipynb`.
 #
 # **Tasks**
 # - [ ] 1 · Raw data: what dbt does not load (5')
@@ -42,7 +42,7 @@ if IN_COLAB:
                     "duckdb>=1.4", "dbt-core>=1.10,<2", "dbt-duckdb>=1.11"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
-        os.chdir("..")  # solutions/ notebooks run from labs/
+        os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/
 sys.path.insert(0, os.getcwd())
 
 import json
@@ -53,7 +53,7 @@ import de_utils as U
 import de_viz as V
 
 # Rerunning THIS cell starts the lab again from an empty folder (it only deletes this lab's own outputs).
-OUT = U.lab_dir("D2_0_dbt_from_scratch", reset=True)
+OUT = U.lab_dir("tools_dbt", reset=True)
 PROJ = OUT / "qafila_intro"
 PROJ.mkdir()
 DB = OUT / "qafila_intro.duckdb"
@@ -362,7 +362,9 @@ from dbt.cli.main import dbtRunner
 
 def dbt(*args, expect_success=True, log=True):
     flags = ["--no-use-colors", "--no-send-anonymous-usage-stats"] + ([] if log else ["--log-level", "none"])
-    result = dbtRunner().invoke([*flags, *args, "--project-dir", str(PROJ), "--profiles-dir", str(PROJ)])
+    # --log-path keeps dbt.log inside the project; without it dbt writes logs/ next to the notebook.
+    paths = ["--project-dir", str(PROJ), "--profiles-dir", str(PROJ), "--log-path", str(PROJ / "logs")]
+    result = dbtRunner().invoke([*flags, *args, *paths])
     command = "dbt " + " ".join(args)
     if expect_success and not result.success:
         raise RuntimeError(command + " failed: see the log above") from result.exception

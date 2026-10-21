@@ -1,5 +1,5 @@
 # %% [markdown]
-# # Demo 3.2 · Spark, live and visual
+# # Spark, live and visual
 #
 # Day 3 · Session 2 · instructor walkthrough, about 25 minutes. **No exercises:** we run every cell together, watch
 # what Spark does, then read what it tells us. You practise in **Lab 3.2** right after.
@@ -38,7 +38,7 @@ if IN_COLAB:
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", "requirements-colab.txt"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
-        os.chdir("..")  # demos/ notebooks run from labs/
+        os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/
 sys.path.insert(0, os.getcwd())
 
 import de_utils as U
@@ -51,7 +51,7 @@ print("data:", U.RAW, "| quick mode:", U.QUICK)
 # (`order_date=2026-09-23/`), as a nightly ingestion job would land them.
 
 # %%
-LAKE = U.lab_dir("D3_2_demo", reset=True)
+LAKE = U.lab_dir("tools_spark", reset=True)
 con = U.connect(U.build_warehouse())
 con.sql(f"""COPY (SELECT * EXCLUDE (_loaded_at), created_at[:10]::DATE AS order_date FROM raw.orders)
             TO '{(LAKE / "orders").as_posix()}' (FORMAT parquet, PARTITION_BY (order_date))""")

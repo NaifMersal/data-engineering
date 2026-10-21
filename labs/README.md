@@ -20,9 +20,9 @@ Run `00_setup_check.ipynb` once before Day 1: it builds the shared warehouse, do
 
 New to SQL window functions? Work through `00_sql_windows.ipynb` before Day 1 (self-paced, about 90 minutes). It builds `PARTITION BY`, ranking, `LAG`/`LEAD`, frames and `QUALIFY` up from tables small enough to check by eye, and finishes with you deriving the CDC and SCD2 queries that Lab 1.4 needs.
 
-New to Polars? Work through `00_polars_intro.ipynb` before Day 1 too (self-paced, about 90 minutes). It introduces one idea at a time on Qafila's data: DataFrames and types, expressions, `select`, `filter`, `with_columns`, `group_by`, joins, `over` and lazy queries, and finishes with you writing the kind of lazy chain Lab 2.1 starts from.
+New to Polars? Work through `tools/polars.ipynb` before Day 1 too (self-paced, about 90 minutes). It introduces one idea at a time on Qafila's data: DataFrames and types, expressions, `select`, `filter`, `with_columns`, `group_by`, joins, `over` and lazy queries, and finishes with you writing the kind of lazy chain Lab 2.1 starts from.
 
-New to dbt? Before Lab 2.3, work through [`D2_0_dbt_from_scratch.ipynb`](D2_0_dbt_from_scratch.ipynb) (guided, about 100 minutes). Start with an empty project folder and a few teaching rows, write the configuration and models yourself, and read the SQL dbt generates from them. Step-by-step players replay each dbt run on the project's graph and an incremental `delete+insert` row by row, then compare it with `merge`; you break an incremental model on purpose and watch a failing test skip the report. Five short exercises along the way, and a tested city sales report at the end. This is an extended walkthrough outside the regular 25-minute session lab.
+New to dbt? Before Lab 2.3, work through [`tools/dbt.ipynb`](tools/dbt.ipynb) (guided, about 100 minutes). Start with an empty project folder and a few teaching rows, write the configuration and models yourself, and read the SQL dbt generates from them. Step-by-step players replay each dbt run on the project's graph and an incremental `delete+insert` row by row, then compare it with `merge`; you break an incremental model on purpose and watch a failing test skip the report. Five short exercises along the way, and a tested city sales report at the end. This is an extended walkthrough outside the regular 25-minute session lab.
 
 **Lab 3.2 (Spark)** needs Java 17+. On Colab the lab installs it. Locally, install a JDK (for example [Temurin 21](https://adoptium.net/)), set `JAVA_HOME`, then `uv sync --extra spark`. On native Windows, Spark also needs `winutils.exe` to write files, so Windows users should run Lab 3.2 on Colab (or in WSL).
 
@@ -34,14 +34,14 @@ Set `DE_QUICK=1` to shrink the heavier workloads. Useful on slow laptops and for
 |---|---|---|---|
 | 0 | Setup | [`00_setup_check.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_setup_check.ipynb) | CPU |
 | 0 | Prerequisite: SQL window functions (self-paced) | [`00_sql_windows.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_sql_windows.ipynb) | CPU |
-| 0 | Prerequisite: Polars, one idea at a time (self-paced) | [`00_polars_intro.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_polars_intro.ipynb) | CPU |
+| 0 | Prerequisite: Polars, one idea at a time (self-paced) | [`tools/polars.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/polars.ipynb) | CPU |
 | 1 | Platform tour | [`D1_1_platform_tour.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_1_platform_tour.ipynb) | CPU |
 | 1 | Files & columnar storage | [`D1_2_files_parquet.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_2_files_parquet.ipynb) | CPU |
 | 1 | Batch ingestion (dlt) | [`D1_3_ingestion_dlt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_3_ingestion_dlt.ipynb) | CPU |
 | 1 | CDC & SCD2 | [`D1_4_cdc_merge_scd.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_4_cdc_merge_scd.ipynb) | CPU |
 | 2 | Bronze → silver (DuckDB, Polars) | [`D2_1_bronze_to_silver.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_1_bronze_to_silver.ipynb) | CPU |
 | 2 | Dimensional modeling | [`D2_2_dimensional_modeling.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_2_dimensional_modeling.ipynb) | CPU |
-| 2 | Guided preparation: dbt from an empty folder (about 100 min) | [`D2_0_dbt_from_scratch.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_0_dbt_from_scratch.ipynb) | CPU |
+| 2 | Guided preparation: dbt from an empty folder (about 100 min) | [`tools/dbt.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dbt.ipynb) | CPU |
 | 2 | dbt project | [`D2_3_dbt_project.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_3_dbt_project.ipynb) | CPU |
 | 2 | Testing & data quality | [`D2_4_data_quality.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_4_data_quality.ipynb) | CPU |
 | 3 | Iceberg lakehouse | [`D3_1_iceberg_lakehouse.ipynb`](https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D3_1_iceberg_lakehouse.ipynb) | CPU |
@@ -59,7 +59,7 @@ Exercises are marked **✏️ Exercise** and raise `NotImplementedError` until y
 
 Labs don't depend on each other: from Day 2 on, each lab starts from `U.build_warehouse()`, the end state of the Day 1 ingestion labs (`warehouse/qafila.duckdb`, schema `raw`). Each lab writes its own outputs to `artifacts/<lab>/`.
 
-The guided dbt walkthrough is self-contained: it creates its own tiny teaching database and project in `artifacts/D2_0_dbt_from_scratch/`, without using the shared warehouse. Rerunning its workspace setup cell resets only that walkthrough's generated files. Its student notebook has five exercises; the reference notebook in `solutions/` includes their answers.
+The guided dbt walkthrough is self-contained: it creates its own tiny teaching database and project in `artifacts/tools_dbt/`, without using the shared warehouse. Rerunning its workspace setup cell resets only that walkthrough's generated files. Its student notebook has five exercises; the reference notebook in `solutions/tools/` includes their answers.
 
 ## Data
 
@@ -97,4 +97,5 @@ Notebooks are generated from `_src/*.py` (percent format). Edit the source, then
 ```bash
 uv run python _tools/py2nb.py                    # rebuild all (student + solutions)
 uv run python _tools/py2nb.py D3_1_iceberg_lakehouse   # rebuild one
+uv run python _tools/py2nb.py dbt                # one tool walkthrough: _src/tools/dbt.py → tools/ + solutions/tools/
 ```

@@ -1,5 +1,5 @@
 # %% [markdown]
-# # Lab 0 · Polars, one idea at a time
+# # Polars, one idea at a time
 #
 # Before Day 1 · self-paced · about 90 min. Labs 1.2, 2.1, 2.4, 3.1 and the capstone use **Polars**, a fast DataFrame
 # library, and Lab 2.1 expects you to chain a filter, a join, a parse and an aggregation in one go. This lab builds that
@@ -43,7 +43,7 @@ if IN_COLAB:
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", "requirements-colab.txt"], check=True)
 else:
     while not Path("de_utils.py").exists() and Path.cwd() != Path.cwd().parent:
-        os.chdir("..")  # solutions/ notebooks run from labs/
+        os.chdir("..")  # tools/ and solutions/tools/ notebooks run from labs/
 sys.path.insert(0, os.getcwd())
 
 import de_utils as U

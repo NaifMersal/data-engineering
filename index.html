@@ -84,7 +84,7 @@
   </div>
 
   <h2>Schedule and materials</h2>
-  <p><a href="slides/architecture-story.html">Visual lesson: Warehouse, Lake, Lakehouse</a> · Follow Qafila’s changing needs, compare the designs, and check your understanding.</p>
+  <p><a href="slides/00_story.html">Visual lesson: Warehouse, Lake, Lakehouse</a> · Follow Qafila’s changing needs, compare the designs, and check your understanding.</p>
   <p style="color:var(--muted)">Each day: Session 1 → 10' break → Session 2 → 20' break → Session 3 → 10' break → Session 4. Each session is about 20–25 minutes of concepts and demos, then a 25-minute lab. In the slides press <code>F</code> for fullscreen, <code>←</code> <code>→</code> to navigate, <code>N</code> for speaker notes, <code>?</code> for help.</p>
 
   <div class="day">
@@ -109,7 +109,7 @@
       <tr><td class="brk" colspan="2">Break · 10 min</td></tr>
       <tr><td><b>2 · Dimensional modeling</b>: grain, facts and dimensions, star schema, surrogate keys</td><td><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_2_dimensional_modeling.ipynb">D2_2_dimensional_modeling</a></td></tr>
       <tr><td class="brk" colspan="2">Break · 20 min</td></tr>
-      <tr><td><b>Guided dbt preparation</b>: empty folder to a tested city sales report (about 100 min, outside session time)</td><td><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_0_dbt_from_scratch.ipynb">D2_0_dbt_from_scratch</a></td></tr>
+      <tr><td><b>Guided dbt preparation</b>: empty folder to a tested city sales report (about 100 min, outside session time)</td><td><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dbt.ipynb">tools/dbt</a></td></tr>
       <tr><td><b>3 · dbt: transformation as software</b>: sources, refs, layers, incremental models, lineage</td><td><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_3_dbt_project.ipynb">D2_3_dbt_project</a></td></tr>
       <tr><td class="brk" colspan="2">Break · 10 min</td></tr>
       <tr><td><b>4 · Testing &amp; data quality</b>: dbt tests, unit tests, model contracts, Pandera, quarantine</td><td><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D2_4_data_quality.ipynb">D2_4_data_quality</a></td></tr>
@@ -194,13 +194,13 @@
     <div>
       <h2>Setup</h2>
       <p><b>Audience:</b> Python- and SQL-proficient developers, analysts and data scientists moving into data engineering. No prior Spark, dbt, orchestration or streaming experience needed.</p>
-      <p><b>Environment:</b> any laptop CPU with <code>uv</code>, or Google Colab. No Docker or cloud account; Java 17+ only for the Spark lab (on Colab the lab installs it). Run <a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_setup_check.ipynb">00_setup_check</a> before Day 1, and work through <a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_sql_windows.ipynb">00_sql_windows</a> (about 90 minutes, self-paced) if SQL window functions are new to you, and <a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_polars_intro.ipynb">00_polars_intro</a> (about 90 minutes, self-paced) if Polars is; see <a href="https://github.com/SDAIAAcademy/data-engineering/tree/main/labs#readme">labs/README.md</a>.</p>
+      <p><b>Environment:</b> any laptop CPU with <code>uv</code>, or Google Colab. No Docker or cloud account; Java 17+ only for the Spark lab (on Colab the lab installs it). Run <a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_setup_check.ipynb">00_setup_check</a> before Day 1, and work through <a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_sql_windows.ipynb">00_sql_windows</a> (about 90 minutes, self-paced) if SQL window functions are new to you, and <a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/polars.ipynb">tools/polars</a> (about 90 minutes, self-paced) if Polars is; see <a href="https://github.com/SDAIAAcademy/data-engineering/tree/main/labs#readme">labs/README.md</a>.</p>
       <p><b>Stack:</b> DuckDB · Polars · Parquet / Arrow · dlt · dbt + dbt-duckdb · Apache Iceberg (PyIceberg) · PySpark 4 · Pandera · Dagster · ODCS data contracts · model2vec · an OpenAI-compatible LLM endpoint (optional).</p>
     </div>
   </div>
 </main>
 <footer><div class="wrap">SDAIA Academy · Data Engineering Track · Modern Data Engineering</div></footer>
-<script src="assets/logo.js"></script>
+<script src="assets/deck/logo.js"></script>
 <script>document.getElementById('logo').innerHTML = window.ACADEMY_LOGO || 'SDAIA Academy';</script>
 </body>
 </html>

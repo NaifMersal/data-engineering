@@ -701,7 +701,7 @@ def iceberg_tree(metadata_location, max_files=40):
 
 
 # ---------------------------------------------------------------------------
-# Demo 3.1 · Iceberg on a lightboard
+# tools/iceberg · Iceberg on a lightboard
 # ---------------------------------------------------------------------------
 # Step-by-step players in the style of a lightboard talk: a dark board on which every step draws one more piece.
 # The Iceberg boards are drawn from the table's own metadata files; the steps only choose what to show, and when.
@@ -1678,7 +1678,7 @@ def watermark(events, allowed_lateness, window=timedelta(minutes=15), start=None
 
 
 # ---------------------------------------------------------------------------
-# Lab 2.0 · dbt
+# tools/dbt · dbt
 # ---------------------------------------------------------------------------
 
 _STEP_CSS = """
@@ -2256,7 +2256,7 @@ def animate_incremental(all_rows, candidates, before, key, cutoff, show=None, fi
 
 
 # ---------------------------------------------------------------------------
-# Demo 3.2 · Spark
+# tools/spark · Spark
 # ---------------------------------------------------------------------------
 
 _SPARK_CSS = """
