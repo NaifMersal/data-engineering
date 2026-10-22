@@ -15,6 +15,12 @@ const svg=content=>{const id=svgCount++;return `<svg class="wires" viewBox="0 0 
 const box=(title,body,x,y,w,cls='',id=title,tag='')=>`<div class="stage-box ${cls}" data-id="${id}" style="left:${x}px;top:${y}px;width:${w}px"><h3>${title}</h3>${body}${tag?`<span class="tag">${tag}</span>`:''}</div>`;
 // Tool names sit beside the work they perform. Dataset boxes always describe stored data.
 const tool=(name,action,x,y,w=250,id=name,cls='')=>label(`<strong>${name}</strong><span>${action}</span>`,x,y,`tool-label ${cls}`,w,id);
+// A row card: monospace key, a line of detail, an amount on the right. Cards keep their id, so a row glides between slides.
+const rec=(id,x,y,w,head,body='',amount='',cls='')=>label(`<b>${head}</b>${body?`<span>${body}</span>`:''}${amount?`<i>${amount}</i>`:''}`,x,y,`rec ${cls}`,w,id);
+// A small table: rows are arrays of cells, or {c:[cells],cls} for a highlighted row.
+const tbl=(id,x,y,w,title,cols,rows,cls='')=>label(`<div class="t-title">${title}</div>${rows.map(r=>{const [c,rc]=Array.isArray(r)?[r,'']:[r.c,r.cls];return `<div class="t-row ${rc}" style="grid-template-columns:${cols}">${c.map(v=>`<span>${v}</span>`).join('')}</div>`;}).join('')}`,x,y,`tbl ${cls}`,w,id);
+// A recall board: numbered questions with an empty answer beside each. The same items with shown=true fill the answers in place.
+const recall=(items,shown=false)=>{const gap=Math.floor(505/items.length);return items.map(([q,a],i)=>label(`<b>${i+1}</b>${q}`,0,i*gap,'recall-q',840,`rq${i}`)+label(shown?a:'?',880,i*gap-6,`recall-a${shown?' shown':''}`,560,`ra${i}`)).join('');};
 // The course map, redrawn by stage. The same data as de_viz.platform_map (labs/de_viz.py) and the decks' .pmap (assets/deck/deck.js): change them together.
 // mark(name) returns '' (plain), 'met' (faded) or 'fresh' (highlighted); a fresh piece with what[name] shows that instead of its session code.
 const MAP_TOOLS=[['dlt','2/3',2,'D1_3'],['DuckDB','3/7',2,'D1_1'],['CDC + MERGE','2/3',3,'D1_4'],['Parquet','3/4',3,'D1_2'],['Polars','4/6',3,'D2_1'],['Semantic layer','6/7',3,'D4_4'],['Streaming','2/3',4,'D3_3'],['Iceberg','3/4',4,'D3_1'],['dbt','4/6',4,'D2_2 · D2_3'],['Embeddings','6/7',4,'D4_4'],['Spark','4/5',5,'D3_2'],['Pandera','5/6',5,'D2_4'],['Contracts','5/6',6,'D4_2']];
@@ -128,5 +134,5 @@ function start({brand,sources={}}){
  window.addEventListener('resize',fit);window.addEventListener('hashchange',()=>show((parseInt(location.hash.slice(1),10)||1)-1,false));fit();show((parseInt(location.hash.slice(1),10)||1)-1);
  if(location.search.includes('check')){const initial=index,issues=[];for(let i=0;i<els.length;i++){show(i,false);const r=els[i].getBoundingClientRect();for(const e of els[i].querySelectorAll('.figure,.annotation,.label,.stage-box,.heading,.takeaway,.compare-col,.quiz-option,.feedback,.quiz-instruction,.references,.platform,.platform>div,.mapping,.trap')){const b=e.getBoundingClientRect();if(!b.width||!b.height)continue;if(b.left<r.left-1||b.right>r.right+1||b.top<r.top-1||b.bottom>r.bottom+1)issues.push(`Slide ${i+1}: ${e.className} outside canvas`);if(e.scrollWidth>e.clientWidth+3)issues.push(`Slide ${i+1}: ${e.className} overflow`);}}show(initial,false);window.STORY_LAYOUT_CHECK={slides:els.length,issues};const report=document.createElement('output');report.id='check-report';report.style.cssText='position:fixed;left:8px;bottom:8px;font:12px monospace;z-index:99;background:white;padding:5px';report.textContent=`CHECK ${els.length} slides: ${issues.length?issues.join('; '):'OK'}`;document.body.appendChild(report);}
 }
-window.Story={art,label,note,path,outline,svg,box,tool,platform,add,start};
+window.Story={art,label,note,path,outline,svg,box,tool,rec,tbl,recall,platform,add,start};
 })();
