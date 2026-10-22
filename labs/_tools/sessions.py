@@ -22,7 +22,6 @@ DAYS = {
     3: ("Lakehouse, Scale & Streaming", "coral"),
     4: ("Production: Orchestration, Reliability, Governance & AI", "purple"),
 }
-BREAKS = {1: "Break · 10 min", 2: "Break · 20 min", 3: "Break · 10 min"}   # after sessions 1, 2, 3
 
 # teach: a tool walkthrough (labs/tools/<name>.ipynb) or a concept deck (slides/<name>.html);
 # opens_with: (tool, section) of another walkthrough taught first in the same session
@@ -97,35 +96,28 @@ def a(href: str, text: str) -> str:
 def html_rows(day: int) -> str:
     title, colour = DAYS[day]
     rows = []
-    for n, s in enumerate([s for s in SESSIONS if s["id"].startswith(f"D{day}_")], start=1):
+    for s in [s for s in SESSIONS if s["id"].startswith(f"D{day}_")]:
         if "tool" in s:
             t = s["tool"]
-            teach = (f'<span class="fmt" title="tool walkthrough, no slides">📓</span> '
-                     f'{a(COLAB + "tools/" + t + ".ipynb", "tools/" + t)} '
-                     f'<span class="alt">· {a("labs/tools/html/" + t + ".html", "read")}</span>')
+            teach = (f'<span title="tool walkthrough, no slides">📓</span> {a(COLAB + "tools/" + t + ".ipynb", t)}'
+                     f' <span class="alt">{a("labs/tools/html/" + t + ".html", "read")}</span>')
             if "opens_with" in s:
                 o, sec = s["opens_with"]
-                teach = teach.replace("</span> ", f'</span> {a(COLAB + "tools/" + o + ".ipynb", "tools/" + o)} '
-                                                  f'{esc(sec)}, then ', 1)
+                teach = teach.replace("</span> ", f'</span> {a(COLAB + "tools/" + o + ".ipynb", o)} {esc(sec)} → ', 1)
         else:
-            teach = f'<span class="fmt" title="concept deck">🖥️</span> {a("slides/" + s["deck"] + ".html", "slides")}'
+            teach = f'<span title="concept deck">🖥️</span> {a("slides/" + s["deck"] + ".html", "slides")}'
             if "demo" in s:
-                teach += f' <span class="alt">· {a(COLAB + "demos/" + s["demo"] + ".ipynb", "demo")}</span>'
-        lab = a(COLAB + s["lab"] + ".ipynb", s["lab"])
+                teach += f' <span class="alt">{a(COLAB + "demos/" + s["demo"] + ".ipynb", "demo")}</span>'
+        lab = f'<a href="{COLAB}{s["lab"]}.ipynb" title="{s["lab"]}.ipynb">Lab</a>'
         if s.get("runs_on", "").startswith("Colab"):
-            lab += ' <span class="alt">(Colab)</span>'
+            lab += ' <span class="alt">Colab</span>'
         rows.append(
-            f'      <tr><td><b>{s["id"]} · {esc(s["title"])}</b><div class="topics">{esc(s["topics"])}</div></td>'
-            f'<td><span class="stage">{esc(s["stage"])}</span></td><td>{teach}</td><td>{lab}</td>'
-            f'<td>{a(COLAB + "solutions/" + s["lab"] + ".ipynb", "solution")}</td></tr>')
-        if n in BREAKS:
-            rows.append(f'      <tr><td class="brk" colspan="5">{BREAKS[n]}</td></tr>')
-    return (f'  <div class="day">\n'
-            f'    <div class="day-head" style="--c:var(--{colour})"><div><div class="t">Day {day}</div>'
-            f'<h3>{esc(title)}</h3></div></div>\n'
-            f'    <div class="scroll"><table>\n'
-            f'      <tr><th>Session</th><th>Stage</th><th>Teach from</th><th>Lab</th><th>Solution</th></tr>\n'
-            + "\n".join(rows) + "\n    </table></div>\n  </div>")
+            f'      <li><div><b>{s["id"]} · {esc(s["title"])}</b><small>{esc(s["topics"])}</small></div>'
+            f'<span>{teach}</span><span>{lab}</span>'
+            f'<span>{a(COLAB + "solutions/" + s["lab"] + ".ipynb", "Solution")}</span></li>')
+    return (f'  <section class="day" style="--c:var(--{colour})">\n'
+            f'    <h3><span>Day {day}</span>{esc(title)}</h3>\n'
+            f'    <ol>\n' + "\n".join(rows) + "\n    </ol>\n  </section>")
 
 
 def markdown_rows() -> str:
