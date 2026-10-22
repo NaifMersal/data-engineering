@@ -48,7 +48,7 @@ RAW = U.RAW.as_posix()          # DuckDB likes forward slashes, also on Windows
 # %% [markdown]
 # ## 1 · Query CSV, JSON lines and SQLite in place (5')
 #
-# Qafila's data lives in several places (see "The data we use" in the intro deck, `slides/00_intro.html`). DuckDB reads each of them where it is:
+# Qafila's data lives in several places (see "Every step leaves a record" in the intro deck, `slides/00_intro.html`). DuckDB reads each of them where it is:
 #
 # | Source | Path | DuckDB reader |
 # |---|---|---|
@@ -149,6 +149,7 @@ plt.show()
 #
 # ## 3 · Check keys: duplicate customers, orphan orders (5')
 #
+# The keys link the tables (see "Other keys name who and what" in the intro deck): every order's `customer_id` should find a row in `customers`.
 # A primary key in the source database only guarantees the **ID** is unique, not that each **person** appears once.
 #
 # ✏️ **Exercise** · Compute three numbers:
