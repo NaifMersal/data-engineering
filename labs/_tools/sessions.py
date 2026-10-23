@@ -40,13 +40,15 @@ OPENING = [
 ]
 
 # teach: a tool walkthrough (labs/tools/<name>.ipynb), a concept deck (slides/<name>.html, "#n" opens board n), or both
-# (the deck first, then the walkthrough); opens_with: (tool, section) of another walkthrough taught first in the same session
+# (the deck first, then the walkthrough); opens_with: (tool, section) of another walkthrough taught first in the same session;
+# boards: the part of a deck a session teaches, when two sessions share one deck
 SESSIONS = [
     dict(id="D1_1", title="Storage for analytics 1 · rows and columns", stage="Store · query", deck="D1_1_storage",
-         tool="duckdb", topics="OLTP vs. OLAP, row vs. column storage, compression; DuckDB, files in place, one writer",
+         boards="1–14", tool="duckdb",
+         topics="OLTP vs. OLAP, row vs. column storage, compression; DuckDB, files in place, one writer",
          lab="D1_1_platform_tour"),
     dict(id="D1_2", title="Storage for analytics 2 · columns in a file", stage="Store", deck="D1_1_storage#15",
-         topics="CSV vs. Parquet, row groups and statistics, sorting to skip, partitions, small files",
+         boards="15–28", topics="CSV vs. Parquet, row groups and statistics, sorting to skip, partitions, small files",
          lab="D1_2_files_parquet"),
     dict(id="D1_3", title="Batch ingestion", stage="Ingest", tool="dlt",
          topics="full vs. incremental, cursors, pagination, retries, schema evolution", lab="D1_3_ingestion_dlt"),
@@ -121,8 +123,12 @@ def section(label: str, title: str, colour: str, rows: list[str]) -> str:
             f'    <ol>\n' + "\n".join(rows) + "\n    </ol>\n  </section>")
 
 
-def deck(name: str) -> str:
-    return f'<span title="concept deck">🖥️</span> {a(deck_href(name), "slides")}'
+def deck(name: str, boards: str = "") -> str:
+    return f'<span title="concept deck">🖥️</span> {a(deck_href(name), slides(boards))}'
+
+
+def slides(boards: str = "") -> str:
+    return f"slides {boards}" if boards else "slides"
 
 
 def deck_href(name: str, base: str = "") -> str:
@@ -148,9 +154,9 @@ def html_rows(day: int) -> str:
                 o, sec = s["opens_with"]
                 teach = teach.replace("</span> ", f'</span> {a(COLAB + "tools/" + o + ".ipynb", o)} {esc(sec)} → ', 1)
             if "deck" in s:
-                teach = deck(s["deck"]) + " → " + teach.replace("tool walkthrough, no slides", "tool walkthrough")
+                teach = deck(s["deck"], s.get("boards", "")) + " → " + teach.replace("tool walkthrough, no slides", "tool walkthrough")
         else:
-            teach = deck(s["deck"])
+            teach = deck(s["deck"], s.get("boards", ""))
             if "demo" in s:
                 teach += f' <span class="alt">{a(COLAB + "demos/" + s["demo"] + ".ipynb", "demo")}</span>'
         lab = f'<a href="{COLAB}{s["lab"]}.ipynb" title="{s["lab"]}.ipynb">Lab</a>'
@@ -171,9 +177,9 @@ def markdown_rows() -> str:
                 o, sec = s["opens_with"]
                 teach = f"📓 [`tools/{o}.ipynb`]({COLAB}tools/{o}.ipynb) {sec}, then " + teach[2:]
             if "deck" in s:
-                teach = f"🖥️ [slides]({deck_href(s['deck'], PAGES)}), then " + teach
+                teach = f"🖥️ [{slides(s.get('boards', ''))}]({deck_href(s['deck'], PAGES)}), then " + teach
         else:
-            teach = f"🖥️ [slides]({deck_href(s['deck'], PAGES)})"
+            teach = f"🖥️ [{slides(s.get('boards', ''))}]({deck_href(s['deck'], PAGES)})"
             if "demo" in s:
                 teach += f" + [`demos/{s['demo']}.ipynb`]({COLAB}demos/{s['demo']}.ipynb)"
         runs = s.get("runs_on", "CPU")
