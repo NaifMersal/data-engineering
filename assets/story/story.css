@@ -98,3 +98,9 @@ em.k.bad{color:#a4473b;background:#f6dcd6}.t-row.total{border-top:2px solid #9fb
 .label.bar{display:grid;grid-template-columns:110px 1fr 70px;align-items:center;gap:16px;height:32px;font-weight:400}.bar b{font:600 18px 'Cascadia Code',Consolas,monospace}.bar i{font:600 19px 'Cascadia Code',Consolas,monospace;font-style:normal;text-align:right}
 .bar .track{display:block;height:18px;border-bottom:1px solid #c9d3d6}.bar .track span{display:block;height:100%;background:#9fcbc1;border-radius:0 4px 4px 0}.bar.mine .track span{background:#348f8d}.bar.bad .track span{background:#c46558}.bar.bad b,.bar.bad i{color:#a4473b}
 .label.files{display:flex;gap:2px;height:44px}.files span{flex:none;width:12px;height:44px;border:1.5px solid #8faac6;border-radius:2px;background:#e8f0fc}.files span.k{border-color:#348f8d;background:#348f8d}.files.one span{border-color:#70b5a9;background:#e0f2eb}
+/* D1_1 storage: one value per cell, so a value glides from a row layout to a column layout. */
+.label.cell{height:38px;padding:0 4px;border:1.5px solid #91a9b9;border-radius:3px;background:#fff;font:400 15px/35px 'Cascadia Code',Consolas,monospace;text-align:center;white-space:nowrap}
+.cell.r{border-color:#348f8d;background:#cdeee2;font-weight:600}.cell.x{opacity:.28}.cell.w{border-color:#c46558;background:#fbeee9}
+.label.cell.n{border:0;background:none;font:600 13px/35px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left}.label.cell.n.r{color:#1b6f68}
+.bar.wide{grid-template-columns:190px 1fr 110px}.files.wrap{flex-wrap:wrap;height:auto}.files.wrap span{width:8px;height:15px;border-width:1px}
+.tree .hit{background:#e0f2eb;color:#1b6f68;font-weight:600;border-radius:3px}

@@ -39,14 +39,15 @@ OPENING = [
          topics="why each design exists, and one order's journey through the Qafila platform"),
 ]
 
-# teach: a tool walkthrough (labs/tools/<name>.ipynb) or a concept deck (slides/<name>.html);
-# opens_with: (tool, section) of another walkthrough taught first in the same session
+# teach: a tool walkthrough (labs/tools/<name>.ipynb), a concept deck (slides/<name>.html, "#n" opens board n), or both
+# (the deck first, then the walkthrough); opens_with: (tool, section) of another walkthrough taught first in the same session
 SESSIONS = [
-    dict(id="D1_1", title="The modern data platform", stage="Store · query", tool="duckdb",
-         topics="OLTP vs. OLAP, an analytical database in a library, files in place, plans",
+    dict(id="D1_1", title="Storage for analytics 1 · rows and columns", stage="Store · query", deck="D1_1_storage",
+         tool="duckdb", topics="OLTP vs. OLAP, row vs. column storage, compression; DuckDB, files in place, one writer",
          lab="D1_1_platform_tour"),
-    dict(id="D1_2", title="Files & columnar storage", stage="Store", deck="D1_2_files_parquet",
-         topics="Parquet internals, statistics, partitioning, pushdown, Arrow", lab="D1_2_files_parquet"),
+    dict(id="D1_2", title="Storage for analytics 2 · columns in a file", stage="Store", deck="D1_1_storage#15",
+         topics="CSV vs. Parquet, row groups and statistics, sorting to skip, partitions, small files",
+         lab="D1_2_files_parquet"),
     dict(id="D1_3", title="Batch ingestion", stage="Ingest", tool="dlt",
          topics="full vs. incremental, cursors, pagination, retries, schema evolution", lab="D1_3_ingestion_dlt"),
     dict(id="D1_4", title="Change data capture & load strategies", stage="Ingest → silver", deck="D1_4_cdc_scd",
@@ -121,7 +122,13 @@ def section(label: str, title: str, colour: str, rows: list[str]) -> str:
 
 
 def deck(name: str) -> str:
-    return f'<span title="concept deck">🖥️</span> {a("slides/" + name + ".html", "slides")}'
+    return f'<span title="concept deck">🖥️</span> {a(deck_href(name), "slides")}'
+
+
+def deck_href(name: str, base: str = "") -> str:
+    """slides/<name>.html, or slides/<name>.html#n for a deck taught from board n."""
+    name, _, board = name.partition("#")
+    return f"{base}slides/{name}.html" + (f"#{board}" if board else "")
 
 
 def html_prep() -> str:
@@ -140,6 +147,8 @@ def html_rows(day: int) -> str:
             if "opens_with" in s:
                 o, sec = s["opens_with"]
                 teach = teach.replace("</span> ", f'</span> {a(COLAB + "tools/" + o + ".ipynb", o)} {esc(sec)} → ', 1)
+            if "deck" in s:
+                teach = deck(s["deck"]) + " → " + teach.replace("tool walkthrough, no slides", "tool walkthrough")
         else:
             teach = deck(s["deck"])
             if "demo" in s:
@@ -161,8 +170,10 @@ def markdown_rows() -> str:
             if "opens_with" in s:
                 o, sec = s["opens_with"]
                 teach = f"📓 [`tools/{o}.ipynb`]({COLAB}tools/{o}.ipynb) {sec}, then " + teach[2:]
+            if "deck" in s:
+                teach = f"🖥️ [slides]({deck_href(s['deck'], PAGES)}), then " + teach
         else:
-            teach = f"🖥️ [slides]({PAGES}slides/{s['deck']}.html)"
+            teach = f"🖥️ [slides]({deck_href(s['deck'], PAGES)})"
             if "demo" in s:
                 teach += f" + [`demos/{s['demo']}.ipynb`]({COLAB}demos/{s['demo']}.ipynb)"
         runs = s.get("runs_on", "CPU")
