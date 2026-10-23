@@ -29,6 +29,7 @@ LABS = Path(__file__).resolve().parents[1]
 SRC = LABS / "_src"
 DEMO_SRC = SRC / "demos"
 TOOL_SRC = SRC / "tools"
+WALKTHROUGHS = {"00_sql_windows"}   # self-paced, no exercises: one notebook in labs/, no copy in solutions/
 
 
 def strip_solutions(lines: list[str], student: bool) -> list[str]:
@@ -109,7 +110,7 @@ if __name__ == "__main__":
     demos = [DEMO_SRC / f"{n}.py" for n in names if (DEMO_SRC / f"{n}.py").exists()] if names else sorted(DEMO_SRC.glob("*.py"))
     tools = [TOOL_SRC / f"{n}.py" for n in names if (TOOL_SRC / f"{n}.py").exists()] if names else sorted(TOOL_SRC.glob("*.py"))
     for s in sources:
-        for student in (True, False):
+        for student in (True,) if s.stem in WALKTHROUGHS else (True, False):
             print("wrote", convert(s, student).relative_to(LABS))
     for s in tools:
         for student in (True, False):

@@ -23,12 +23,12 @@ DAYS = {
     4: ("Production: Orchestration, Reliability, Governance & AI", "purple"),
 }
 
-# done on your own before Day 1; solution: the notebook has a worked solution in labs/solutions/
+# done on your own before Day 1
 PREP = [
     dict(title="Setup check", nb="00_setup_check",
          topics="installs the packages, generates the data and tests every tool; run it once"),
-    dict(title="SQL window functions (if new to them)", nb="00_sql_windows", solution=True,
-         topics="self-paced, about 90 minutes: ranking, LAG/LEAD, frames, QUALIFY; Lab 1.4 builds on them"),
+    dict(title="SQL window functions (if new to them)", nb="00_sql_windows",
+         topics="a self-paced walkthrough, about 60 minutes: ranking, LAG/LEAD, frames, QUALIFY; Lab 1.4 builds on them"),
 ]
 
 # the two decks that open Day 1, before D1_1
@@ -125,9 +125,7 @@ def deck(name: str) -> str:
 
 
 def html_prep() -> str:
-    rows = [li(p["title"], p["topics"], lab=a(COLAB + p["nb"] + ".ipynb", "Notebook"),
-               solution=a(COLAB + "solutions/" + p["nb"] + ".ipynb", "Solution") if p.get("solution") else "")
-            for p in PREP]
+    rows = [li(p["title"], p["topics"], lab=a(COLAB + p["nb"] + ".ipynb", "Notebook")) for p in PREP]
     return section("Before Day 1", "On your own", "navy", rows)
 
 

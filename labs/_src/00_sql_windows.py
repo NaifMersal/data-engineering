@@ -1,31 +1,23 @@
 # %% [markdown]
-# # Lab 0 · SQL window functions, from first principles
+# # SQL window functions, from first principles
 #
-# Before Day 1 · self-paced · about 90 min. Labs 1.4, 2.1, 3.4 and the capstone lean on window functions: deduplicate a
-# feed, keep the latest event per key, close a validity interval with the next change. This lab builds them up from
-# nothing, on tables small enough to check by eye, then has you derive the CDC and SCD2 queries yourself.
+# Before Day 1 · self-paced · about 60 min. Labs 1.4, 2.1, 3.4 and the capstone lean on window functions: remove
+# duplicate events, keep the latest event per key, find out from when to when something was true. This walkthrough
+# builds them up from nothing, on tables small enough to check by eye.
 #
-# Every section follows the same rhythm: **🤔 predict** what a query returns, run it, then read the explanation.
-# Write your prediction down before you run the cell: that's where the learning happens.
+# 🤔 asks you to predict before you run a cell · 🔍 says what the output means · ▶ cells play a window function back
+# step by step.
 #
-# **How the exercises work.** Each ✏️ exercise asks for **one** result and tells you what a correct one looks like.
-# Its code cell starts with a template in comments:
-# 1. select the template lines and uncomment them (`Ctrl+/`, or `Cmd+/` on a Mac);
-# 2. replace every `___` with the right column, function or value;
-# 3. delete the two lines below the template (`# ✏️ YOUR CODE HERE` and `raise NotImplementedError(...)`);
-# 4. run the cell, then the check cell after it: each ✅ means that part is right.
-#
-# **Tasks**
-# - [ ] 1 · `GROUP BY` collapses rows, `OVER` keeps them (10')
-# - [ ] 2 · `PARTITION BY` and `ORDER BY`: each row's window (10')
-# - [ ] 3 · Ranking: `ROW_NUMBER`, `RANK`, ties, deduplication (10')
-# - [ ] 4 · `LAG` and `LEAD`: looking at the neighbours (10')
-# - [ ] 5 · Frames: "everything before me" (10')
-# - [ ] 6 · Evaluation order: why `WHERE` can't, and `QUALIFY` can (10')
-# - [ ] 7 · Derive SCD2 by hand, then in SQL; break it on purpose (15')
-# - [ ] 8 · The same ideas on real data: courier events (15')
-#
-# A **visual summary** at the end draws every idea of the lab from the tables you built.
+# **Contents**
+# - [ ] 1 · `GROUP BY` collapses rows, `OVER` keeps them
+# - [ ] 2 · `PARTITION BY` and `ORDER BY`: each row's window
+# - [ ] 3 · Ranking: `ROW_NUMBER`, `RANK`, ties, deduplication
+# - [ ] 4 · `LAG` and `LEAD`: looking at the neighbours
+# - [ ] 5 · Frames: "everything before me"
+# - [ ] 6 · Evaluation order: why `WHERE` can't, and `QUALIFY` can
+# - [ ] 7 · A customer's city history: by hand, then in SQL; break it on purpose
+# - [ ] 8 · The same ideas on real data: courier events
+# - [ ] 9 · Summary
 
 # %%
 import os, sys, subprocess
@@ -72,9 +64,9 @@ con.sql("""
 con.sql("FROM orders").df()
 
 # %% [markdown]
-# And `changes`: a change feed for the same customers, in the order it **arrived**, like the Debezium feed of Lab 1.4.
-# `lsn` is the position in the database's log (the true order of the changes); `op` is `c`reate, `u`pdate or `d`elete.
-# A delete carries no city: the row is gone.
+# And `changes`: every edit the app made to the same customers' city, in the order the edits **arrived** at the data
+# team. `lsn` numbers the edits in the order they really happened in the app database; `op` is `c`reate, `u`pdate or
+# `d`elete. A delete carries no city: the customer closed their account.
 
 # %%
 con.sql("""
@@ -94,12 +86,12 @@ con.sql("""
 con.sql("FROM changes").df()
 
 # %% [markdown]
-# Look closely before going on: the event at arrival 6 is a **redelivery** of arrival 5 (same `lsn`), and the event at
-# arrival 7 is **late** (`lsn` 18 arrived after `lsn` 22). Both are normal in CDC, and both will bite us.
+# Arrival 6 is a **redelivery** of arrival 5 (same `lsn`), and arrival 7 is **late** (`lsn` 18 arrived after `lsn` 22).
+# Both are normal when edits are copied over a network, and both will bite us.
 #
-# ## 1 · `GROUP BY` collapses rows, `OVER` keeps them (10')
+# ## 1 · `GROUP BY` collapses rows, `OVER` keeps them
 #
-# You know aggregates: `GROUP BY customer_id` turns each group of rows into **one** row.
+# `GROUP BY customer_id` turns each group of rows into **one** row.
 
 # %%
 con.sql("SELECT customer_id, sum(amount) AS total FROM orders GROUP BY customer_id ORDER BY customer_id").df()
@@ -115,18 +107,13 @@ con.sql("""
 """).df()
 
 # %% [markdown]
-# 🔍 Eight rows. A **window function** computes an aggregate over a set of rows related to the current row (its
-# **window**) and writes the answer **next to** the row instead of replacing the group with it. `PARTITION BY
-# customer_id` says "the window of a row is every row with the same customer". Nothing is physically moved or sorted
-# in the table: the engine just knows which rows belong together.
+# 🔍 Eight rows. A **window function** computes an aggregate over the rows related to the current row (its **window**)
+# and writes the answer **next to** the row instead of replacing the group with it. `PARTITION BY customer_id` says
+# "the window of a row is every row with the same customer". So you can compare a row to its group without a self-join.
 #
-# That's what makes windows useful: you can compare a row to its group without a self-join.
-#
-# ▶ **Step through it.** `V.animate_window` (a helper of this course) takes a table and one window function, written
-# exactly as in a `SELECT`, runs it in DuckDB and plays it back: the engine splits the rows into windows, then visits
-# each row, and the highlighted rows are the ones `sum` reads for that row. Press **Play**, or click **Next** to go one
-# step at a time. (If the buttons do nothing in Jupyter, run the cell again: notebooks only run scripts in cells you
-# executed yourself.)
+# ▶ **Step through it.** `V.animate_window` (a helper of this course) runs one window function in DuckDB and plays it
+# back: the highlighted rows are the ones `sum` reads for each row. Press **Play**, or **Next** for one step at a time.
+# (If the buttons do nothing in Jupyter, run the cell again: notebooks only run scripts in cells you executed.)
 
 # %%
 V.animate_window(con, "orders",
@@ -135,38 +122,20 @@ V.animate_window(con, "orders",
     step_text="adds up the amounts of every row in its window: {rows}")
 
 # %% [markdown]
-# ✏️ **Exercise 1** · For every order, compute `share`: the order's amount divided by its customer's total amount.
-# - **Result:** `shares`, 8 rows, columns `order_id`, `customer_id`, `amount`, `share` (rounded to 2 decimals).
-# - **Check yourself:** customer 101 spent 120 SAR in total, so order 3 (60 SAR) has `share` = 0.5.
+# Finance's question "what share of the customer's spend is this order?" is one division by that window:
 
 # %%
-# Template:
-# shares = con.sql("""
-#     SELECT order_id, customer_id, amount,
-#            round(amount / ___(amount) OVER (PARTITION BY ___), 2) AS share
-#     FROM orders
-#     ORDER BY order_id
-# """).df()
-# BEGIN SOLUTION
-shares = con.sql("""
+con.sql("""
     SELECT order_id, customer_id, amount,
            round(amount / sum(amount) OVER (PARTITION BY customer_id), 2) AS share
     FROM orders
     ORDER BY order_id
 """).df()
-# END SOLUTION
-shares
-
-# %%
-U.check(len(shares) == 8, "one row per order: the window kept them all")
-U.check(shares.loc[shares.order_id == 3, "share"].item() == 0.5, "order 3 is half of customer 101's 120 SAR")
-U.check(shares.groupby("customer_id").share.sum().round(1).eq(1.0).all(), "shares add up to 1 per customer")
 
 # %% [markdown]
-# ## 2 · `PARTITION BY` and `ORDER BY`: each row's window (10')
+# ## 2 · `PARTITION BY` and `ORDER BY`: each row's window
 #
 # `OVER ()` with nothing inside: the window is the whole table. `PARTITION BY` cuts it into groups.
-# Now add `ORDER BY` inside the window.
 #
 # 🤔 **Predict** · Below, the only difference between `total` and `with_order` is `ORDER BY created_at` inside `OVER`.
 # Will `with_order` be the same as `total`? If not, what will it be for customer 101?
@@ -183,13 +152,12 @@ con.sql("""
 # %% [markdown]
 # 🔍 Adding `ORDER BY` turned the total into a **running total** (40, 100, 120 for customer 101). With an `ORDER BY`,
 # the default window of a row is no longer the whole partition but "from the start of the partition **up to this
-# row**". This catches everyone once; Task 5 shows how to say exactly which rows you want (the **frame**).
+# row**". This catches everyone once; §5 shows how to say exactly which rows you want (the **frame**).
 #
-# Two different `ORDER BY`s live in that query: the one inside `OVER` defines each row's window; the one at the end only
-# sorts the output. They don't have to match.
+# The `ORDER BY` inside `OVER` defines each row's window; the one at the end only sorts the output. They don't have to
+# match.
 #
-# ▶ **Step through it.** Same windows as before, now ordered by date. Watch the highlighted rows grow: each row reads
-# its window from the start **up to itself**.
+# ▶ **Step through it.** Watch the highlighted rows grow: each row reads its window from the start **up to itself**.
 
 # %%
 V.animate_window(con, "orders",
@@ -198,38 +166,9 @@ V.animate_window(con, "orders",
     step_text="adds up the amounts from the start of its window up to itself: {rows}")
 
 # %% [markdown]
-# ✏️ **Exercise 2** · For every order, compute `running`: how much the customer has spent so far, up to and including
-# this order (a running total per customer, in date order).
-# - **Result:** `per_customer`, 8 rows, columns `order_id`, `customer_id`, `created_at`, `amount`, `running`.
-# - **Check yourself:** customer 101's three orders show `running` = 40, 100, 120.
-
-# %%
-# Template:
-# per_customer = con.sql("""
-#     SELECT order_id, customer_id, created_at, amount,
-#            sum(amount) OVER (PARTITION BY ___ ORDER BY ___) AS running
-#     FROM orders
-#     ORDER BY customer_id, created_at
-# """).df()
-# BEGIN SOLUTION
-per_customer = con.sql("""
-    SELECT order_id, customer_id, created_at, amount,
-           sum(amount) OVER (PARTITION BY customer_id ORDER BY created_at) AS running
-    FROM orders
-    ORDER BY customer_id, created_at
-""").df()
-# END SOLUTION
-per_customer
-
-# %%
-U.check(per_customer[per_customer.customer_id == 101].running.tolist() == [40, 100, 120], "running total for 101")
-U.check(per_customer.groupby("customer_id").running.max().tolist() == [120, 110, 30], "each running total ends at the customer's total")
-
-# %% [markdown]
-# ## 3 · Ranking: `ROW_NUMBER`, `RANK`, ties, deduplication (10')
+# ## 3 · Ranking: `ROW_NUMBER`, `RANK`, ties, deduplication
 #
-# Ranking functions number the rows of each partition in the window's order. They don't take an argument: the
-# `ORDER BY` inside `OVER` is what they rank by.
+# Ranking functions take no argument: they number the rows of each partition in the `ORDER BY` of the window.
 #
 # 🤔 **Predict** · Customer 101 has two events with `lsn` 22 (the redelivery). Ordered by `lsn DESC`, what do
 # `row_number`, `rank` and `dense_rank` give those two rows, and the next one?
@@ -250,12 +189,11 @@ con.sql("""
 # to run. `rank` gives ties the same number and skips (1, 1, 3); `dense_rank` doesn't skip (1, 1, 2). `WINDOW w AS (...)`
 # names a window so several functions can share it.
 #
-# That arbitrariness is harmless here, because the two copies are identical. It is **not** harmless when the tied rows
-# differ: then "the latest row" is a coin flip. Add a tie-breaker to the `ORDER BY` (`lsn DESC, arrival DESC`), or
-# deduplicate first.
+# Harmless here, because the two copies are identical. When tied rows **differ**, "the latest row" is a coin flip: add a
+# tie-breaker to the `ORDER BY` (`lsn DESC, arrival DESC`), or deduplicate first.
 #
-# Deduplication is itself a ranking problem: number the copies of each `lsn` and keep copy 1. A filter on a window
-# result needs a subquery here (Task 6 shows a shortcut). We'll use this `dedup` view for the rest of the lab:
+# Deduplication is itself a ranking problem: number the copies of each `lsn` and keep copy 1. Filtering on a window
+# result needs a subquery here (§6 shows a shortcut). The rest of the walkthrough reads this `dedup` view:
 
 # %%
 con.sql("""
@@ -267,22 +205,9 @@ con.sql("""
 print(con.sql("SELECT count(*) FROM changes").fetchall()[0][0], "events ->", con.sql("SELECT count(*) FROM dedup").fetchall()[0][0], "after dedup")
 
 # %% [markdown]
-# ✏️ **Exercise 3** · Find each customer's **last** change: the row with the highest `lsn` for that customer.
-# Number each customer's rows from the highest `lsn` down, then keep row number 1.
-# - **Result:** `latest`, 3 rows (one per customer), columns `customer_id`, `lsn`, `op`, `city`, read from `dedup`.
-# - **Check yourself:** the `lsn` values are 22, 17 and 30; customer 103's last change is a delete (`op` = `d`).
+# The same pattern gives each customer's **last** change: number their rows from the highest `lsn` down, keep number 1.
 
 # %%
-# Template:
-# latest = con.sql("""
-#     SELECT customer_id, lsn, op, city FROM (
-#         SELECT *, row_number() OVER (PARTITION BY ___ ORDER BY ___ DESC) AS rn
-#         FROM dedup
-#     )
-#     WHERE rn = ___
-#     ORDER BY customer_id
-# """).df()
-# BEGIN SOLUTION
 latest = con.sql("""
     SELECT customer_id, lsn, op, city FROM (
         SELECT *, row_number() OVER (PARTITION BY customer_id ORDER BY lsn DESC) AS rn
@@ -291,17 +216,13 @@ latest = con.sql("""
     WHERE rn = 1
     ORDER BY customer_id
 """).df()
-# END SOLUTION
 latest
 
-# %%
-U.check(latest.lsn.tolist() == [22, 17, 30], "the highest lsn per customer, not the last arrival")
-U.check(dict(zip(latest.customer_id, latest.op)) == {101: "u", 102: "u", 103: "d"}, "customer 103's last event is a delete")
-
 # %% [markdown]
-# ▶ **Watch it run.** `row_number` on the raw `changes` (with the redelivery still in): each customer's rows are put
-# in `lsn DESC` order (`arrival` breaks the tie), and each row's number is its position. Keeping number 1 leaves the
-# latest change per customer.
+# 🔍 Customer 101's last **arrival** is `lsn` 18 (Riyadh) but the last **change** is `lsn` 22 (Jeddah). Ordering by
+# `lsn`, not by arrival, is what makes the result right. Customer 103's last change is a delete.
+#
+# ▶ **Watch it run** on the raw `changes`, with the redelivery still in (`arrival` breaks the tie).
 
 # %%
 V.animate_window(con, "changes",
@@ -311,10 +232,7 @@ V.animate_window(con, "changes",
     keep="rn = 1", keep_label="Keep rn = 1 (the latest change of each customer)")
 
 # %% [markdown]
-# 🔍 Customer 101's last **arrival** is `lsn` 18 (Riyadh) but the last **change** is `lsn` 22 (Jeddah). Ordering by
-# the log position, not by arrival, is what makes the result right.
-#
-# ## 4 · `LAG` and `LEAD`: looking at the neighbours (10')
+# ## 4 · `LAG` and `LEAD`: looking at the neighbours
 #
 # `lag(x)` reads `x` from the **previous** row of the window, `lead(x)` from the **next** one. At the edges of a
 # partition there is no neighbour, so you get `NULL` (or a default: `lag(x, 1, 'none')`).
@@ -332,47 +250,26 @@ con.sql("""
 """).df()
 
 # %% [markdown]
-# 🔍 Each customer is a separate world: customer 102's first row has no `prev_city`, even though customer 101's rows
-# come just before it in the output. Without `PARTITION BY`, `lag` would happily read another customer's city.
+# 🔍 Customer 102's first row has no `prev_city`, even though customer 101's rows come just before it in the output:
+# each partition is a separate world. Without `PARTITION BY`, `lag` would read another customer's city.
 #
-# Here is the key idea of SCD2 in one sentence: **a version is valid from its own change time until the next change of
-# the same customer.** "The next change of the same customer" is exactly `lead(...) OVER (PARTITION BY customer_id
-# ORDER BY lsn)`.
-#
-# ✏️ **Exercise 4** · For every change, compute `valid_to`: the `changed_at` of the **next** change of the same
-# customer (in `lsn` order). The last change of each customer has no next change, so its `valid_to` is `NULL`.
-# - **Result:** `intervals`, 8 rows (one per row of `dedup`), columns `customer_id`, `lsn`, `op`, `city`,
-#   `valid_from`, `valid_to`.
-# - **Check yourself:** customer 101's Riyadh row (`lsn` 10) has `valid_to` = 2026-09-05 12:00, the time of `lsn` 15.
+# Marketing asks where a customer lived on a given day. Each city a customer lived in is a **period**: **it starts at
+# its own change and ends at the next change of the same customer.** "The next change of the same customer" is exactly
+# `lead(...) OVER (PARTITION BY customer_id ORDER BY lsn)`:
 
 # %%
-# Template:
-# intervals = con.sql("""
-#     SELECT customer_id, lsn, op, city,
-#            changed_at                                                     AS valid_from,
-#            lead(___) OVER (PARTITION BY customer_id ORDER BY ___)  AS valid_to
-#     FROM dedup
-#     ORDER BY customer_id, lsn
-# """).df()
-# BEGIN SOLUTION
-intervals = con.sql("""
+periods = con.sql("""
     SELECT customer_id, lsn, op, city,
            changed_at                                                     AS valid_from,
            lead(changed_at) OVER (PARTITION BY customer_id ORDER BY lsn)  AS valid_to
     FROM dedup
     ORDER BY customer_id, lsn
 """).df()
-# END SOLUTION
-intervals
-
-# %%
-U.check(intervals.valid_to.isna().sum() == 3, "one open interval per customer: the last event")
-U.check(intervals.loc[intervals.lsn == 10, "valid_to"].item() == pd.Timestamp("2026-09-05 12:00"), "Riyadh ends when Dammam starts")
-U.check(intervals[(intervals.customer_id == 103) & (intervals.op == "c")].valid_to.notna().item(), "the delete closes 103's version")
+periods
 
 # %% [markdown]
-# ▶ **Watch it run.** `lead` reads exactly one row: the **next** one in the same window. The last row of each window
-# has no next row, so it gets `NULL`.
+# ▶ **Watch it run.** `lead` reads exactly one row: the next one in the same window. The last row of each window gets
+# `NULL`: that period is still open, the customer lives there today.
 
 # %%
 V.animate_window(con, "dedup",
@@ -381,18 +278,17 @@ V.animate_window(con, "dedup",
     step_text="reads changed_at from the next row of its window: {rows}")
 
 # %% [markdown]
-# Notice the last row: the delete itself has an open interval, but it isn't a version (there's no city). We'll drop it,
-# and **when** we drop it matters (Task 6).
+# The delete row has an open period too, but it isn't a city (there's none). We'll drop it, and **when** we drop it
+# matters (§6).
 #
-# ## 5 · Frames: "everything before me" (10')
+# ## 5 · Frames: "everything before me"
 #
 # The **frame** says which rows of the partition an aggregate sees, relative to the current row:
 # `ROWS BETWEEN <start> AND <end>`, where each end is `UNBOUNDED PRECEDING`, `n PRECEDING`, `CURRENT ROW`,
 # `n FOLLOWING` or `UNBOUNDED FOLLOWING`. (Ranking functions and `lag`/`lead` ignore frames.)
 #
-# To **see** a frame, use `list(order_id) OVER (...)`. `list` is an aggregate like `sum`, but instead of adding the
-# values up it collects them into a list. So `list(order_id)` over a frame returns the ids of exactly the rows in that
-# frame, e.g. `[1, 2, 3]`: the rows `sum` or `max` would see with the same `OVER (...)`.
+# To **see** a frame, aggregate with `list(order_id)`: it collects the ids of exactly the rows `sum` or `max` would see
+# with the same `OVER (...)`.
 #
 # 🤔 **Predict** · Orders 6 and 7 share a date. Which ids will each column list on order 6's row?
 
@@ -413,38 +309,23 @@ frames
 # and a "running total" by date jumps by both orders at once. When you mean rows, write `ROWS` and give the `ORDER BY` a
 # tie-breaker.
 #
-# `before_me` is the frame Lab 1.4 needs: "the largest `lsn` that arrived **before** this event". If an event's `lsn`
-# is smaller than that, it arrived out of order.
-#
-# ✏️ **Exercise 5** · Count the events of `changes` that arrived **out of order**: their `lsn` is smaller than the
-# largest `lsn` among all the events that arrived **before** them. The template computes that largest earlier `lsn` as
-# `max_before`; you only fill in the frame.
-# - **Result:** `n_out_of_order`, a number.
-# - **Check yourself:** it's 1 (the late `lsn` 18). The redelivered `lsn` 22 isn't smaller than 22, so it doesn't count.
+# `before_me` finds the events that arrived **out of order**: their `lsn` is smaller than the
+# largest `lsn` among everything that arrived before them.
 
 # %%
-# Template:
-# n_out_of_order = con.sql("""
-#     SELECT count(*) FROM (
-#         SELECT lsn, max(lsn) OVER (ORDER BY arrival ROWS BETWEEN ___ AND ___) AS max_before
-#         FROM changes
-#     )
-#     WHERE lsn < max_before
-# """).fetchall()[0][0]
-# BEGIN SOLUTION
-n_out_of_order = con.sql("""
-    SELECT count(*) FROM (
-        SELECT lsn, max(lsn) OVER (ORDER BY arrival ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS max_before
+con.sql("""
+    SELECT arrival, lsn, max_before FROM (
+        SELECT arrival, lsn, max(lsn) OVER (ORDER BY arrival ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS max_before
         FROM changes
     )
     WHERE lsn < max_before
-""").fetchall()[0][0]
-# END SOLUTION
-U.check(n_out_of_order == 1, f"{n_out_of_order} late event (lsn 18); the redelivered 22 is a duplicate, not late")
+""").df()
 
 # %% [markdown]
-# ▶ **Watch it run.** No `PARTITION BY`: the whole table is one window, in arrival order. The frame "everything
-# before me" grows by one row at each step, and `max` reads only those rows. The first row has nothing before it.
+# 🔍 One late event: `lsn` 18. The redelivered 22 isn't smaller than 22: it's a duplicate, not late.
+#
+# ▶ **Watch it run.** No `PARTITION BY`: the whole table is one window, in arrival order. The frame grows by one row at
+# each step, and the first row has nothing before it.
 
 # %%
 V.animate_window(con, "changes",
@@ -454,9 +335,9 @@ V.animate_window(con, "changes",
     keep="lsn < max_before", keep_label="Keep lsn < max_before (the events that arrived out of order)")
 
 # %% [markdown]
-# ## 6 · Evaluation order: why `WHERE` can't, and `QUALIFY` can (10')
+# ## 6 · Evaluation order: why `WHERE` can't, and `QUALIFY` can
 #
-# Task 3 needed a subquery to keep `rn = 1`. Why not just `WHERE row_number() OVER (...) = 1`? Try it:
+# §3 needed a subquery to keep `rn = 1`. Why not just `WHERE row_number() OVER (...) = 1`?
 
 # %%
 try:
@@ -468,33 +349,22 @@ except duckdb.Error as e:
 # 🔍 A `SELECT` is evaluated, **logically**, in this order: `FROM` → `WHERE` → `GROUP BY` → `HAVING` → **window
 # functions** → **`QUALIFY`** → `SELECT` / `DISTINCT` → `ORDER BY` → `LIMIT`. `WHERE` runs before any window exists, so it
 # can't use one. `QUALIFY` (DuckDB, Snowflake, BigQuery, Databricks; not PostgreSQL) is a `WHERE` that runs **after** the
-# windows. (The optimizer may execute things in another order, but the result is always as if it followed this one.)
+# windows. (The optimizer may execute in another order, but the result is always as if it followed this one.)
 #
-# ✏️ **Exercise 6** · Get the same result as Exercise 3 (each customer's last change) **without a subquery**: put the
-# window function straight into a `QUALIFY` clause.
-# - **Result:** `latest_q`, the same 3 rows and columns as `latest`.
+# §3's "last change per customer", without the subquery:
 
 # %%
-# Template:
-# latest_q = con.sql("""
-#     SELECT customer_id, lsn, op, city
-#     FROM dedup
-#     QUALIFY row_number() OVER (PARTITION BY ___ ORDER BY ___ DESC) = ___
-#     ORDER BY customer_id
-# """).df()
-# BEGIN SOLUTION
 latest_q = con.sql("""
     SELECT customer_id, lsn, op, city
     FROM dedup
     QUALIFY row_number() OVER (PARTITION BY customer_id ORDER BY lsn DESC) = 1
     ORDER BY customer_id
 """).df()
-# END SOLUTION
 U.check(latest_q.equals(latest), "same result as the subquery version")
 
 # %% [markdown]
-# The order matters for more than syntax. We want versions without the delete markers. Filtering them with `WHERE` and
-# with `QUALIFY` look interchangeable.
+# The order matters for more than syntax. We want the periods without the delete rows, and filtering them with `WHERE`
+# or with `QUALIFY` looks interchangeable.
 #
 # 🤔 **Predict** · In which of the two queries below is customer 103 (deleted on 20 September) still **current**
 # (`valid_to` is `NULL`)?
@@ -516,39 +386,24 @@ pd.concat({"WHERE (too early)": too_early[too_early.customer_id == 103],
            "QUALIFY (after)": after[after.customer_id == 103]})
 
 # %% [markdown]
-# 🔍 With `WHERE`, the delete is gone before `lead` runs, so `lead` finds no next row and customer 103 looks like they
-# still live in Dammam today. With `QUALIFY`, `lead` sees the delete, closes the version on 20 September, and only then
-# is the marker removed. Same filter, different place in the evaluation order, different history.
+# 🔍 With `WHERE`, the delete is gone before `lead` runs, so customer 103 looks like they still live in Dammam today.
+# With `QUALIFY`, `lead` sees the delete, closes the period on 20 September, and only then is the delete row removed. Same
+# filter, different place in the evaluation order, different history.
 #
-# ## 7 · Derive SCD2 by hand, then in SQL; break it on purpose (15')
+# ## 7 · A customer's city history: by hand, then in SQL; break it on purpose
 #
-# Time to put it together, the way Lab 1.4 will need it. First by hand, from the deduplicated changes in `lsn` order:
+# Everything together, to answer marketing's question for every customer and every day: where did they live? First by
+# hand, from the deduplicated changes in `lsn` order:
 
 # %%
 con.sql("SELECT customer_id, lsn, op, city, changed_at FROM dedup ORDER BY customer_id, lsn").df()
 
 # %% [markdown]
-# ✏️ **Exercise 7a (by hand, no SQL)** · Below is the full history: one row per **version** (every change that isn't
-# a delete), with its city and its start time. Fill in each `valid_to`, the time the version **ends**, using the table
-# above. Two rules:
-# - a version ends when the **next** change of the same customer starts (whatever that change is, even a delete);
-# - if the customer has no next change, the version is still valid: write `None`.
-#
-# - **Result:** `expected`, a list of 7 tuples `(customer_id, city, valid_from, valid_to)`.
-# - **Check yourself:** exactly two versions end in `None` (customer 103 was deleted, so theirs does not).
+# 🤔 **Predict** · One row per **period** (every change that isn't a delete). Cover the code below and work out each
+# `valid_to` from the table above: a period ends when the **next** change of the same customer starts (even a delete);
+# with no next change, it is still true today (`None`).
 
 # %%
-# Template: replace each ___ with a time in quotes, like "2026-09-05 12:00", or with None (no quotes).
-# expected = [
-#     (101, "Riyadh", "2026-09-01 09:00", ___),
-#     (101, "Dammam", "2026-09-05 12:00", ___),
-#     (101, "Riyadh", "2026-09-08 13:00", ___),
-#     (101, "Jeddah", "2026-09-12 08:00", ___),
-#     (102, "Jeddah", "2026-09-02 10:00", ___),
-#     (102, "Riyadh", "2026-09-07 16:00", ___),
-#     (103, "Dammam", "2026-09-14 11:00", ___),
-# ]
-# BEGIN SOLUTION
 expected = [
     (101, "Riyadh", "2026-09-01 09:00", "2026-09-05 12:00"),
     (101, "Dammam", "2026-09-05 12:00", "2026-09-08 13:00"),
@@ -558,29 +413,14 @@ expected = [
     (102, "Riyadh", "2026-09-07 16:00", None),
     (103, "Dammam", "2026-09-14 11:00", "2026-09-20 15:00"),
 ]
-# END SOLUTION
-U.check(len(expected) == 7 and sum(v is None for *_, v in expected) == 2, "7 versions, 2 still current")
 
 # %% [markdown]
-# ✏️ **Exercise 7b (now in SQL)** · Build the same history from `dedup` with one query. `valid_to` comes from `lead`
-# (Task 4). The delete markers (`op = 'd'`) must be removed **after** the window, so that the delete still closes
-# customer 103's version: choose the clause that does that (Task 6).
-# - **Result:** `history`, 7 rows, columns `customer_id`, `city`, `valid_from`, `valid_to`, `is_current`.
-# - **Check yourself:** it matches your `expected` list from 7a, and `is_current` is true on exactly 2 rows.
+# 🔍 Seven periods, two still current: customer 103 was deleted, so theirs is closed. On 10 September customer 101
+# lived in Riyadh: the period from 8 to 12 September.
+#
+# Now in SQL: `valid_to` from `lead` (§4), the delete rows removed **after** the window with `QUALIFY` (§6).
 
 # %%
-# Template:
-# history = con.sql("""
-#     SELECT customer_id, city,
-#            changed_at                  AS valid_from,
-#            lead(changed_at) OVER w         AS valid_to,
-#            lead(changed_at) OVER w IS NULL AS is_current
-#     FROM dedup
-#     WINDOW w AS (PARTITION BY ___ ORDER BY ___)
-#     ___ op <> 'd'                -- WHERE or QUALIFY? (Task 6)
-#     ORDER BY customer_id, valid_from
-# """).df()
-# BEGIN SOLUTION
 history = con.sql("""
     SELECT customer_id, city,
            changed_at                  AS valid_from,
@@ -591,7 +431,6 @@ history = con.sql("""
     QUALIFY op <> 'd'
     ORDER BY customer_id, valid_from
 """).df()
-# END SOLUTION
 history
 
 # %%
@@ -600,12 +439,11 @@ def as_tuples(df):
     fmt = lambda t: None if pd.isna(t) else t.strftime("%Y-%m-%d %H:%M")
     return [(r.customer_id, r.city, fmt(r.valid_from), fmt(r.valid_to)) for r in df.itertuples()]
 
-U.check(as_tuples(history) == expected, "SQL matches your hand-derived history")
-U.check(history.is_current.sum() == 2, "two current versions: customer 103 was deleted")
+U.check(as_tuples(history) == expected, "SQL matches the hand-derived history")
 
 # %% [markdown]
-# Now break it. To change one thing at a time, here is the same query as a function. Its three arguments are the three
-# things the experiments change: the input table, the window's `ORDER BY`, and whether to deduplicate first.
+# Now break it. The same query as a function, with the three things the experiments change as arguments: the input
+# table, the window's `ORDER BY`, and whether to deduplicate first.
 
 # %%
 def history_variant(source="changes", order_by="lsn", dedup=True):
@@ -618,16 +456,14 @@ def history_variant(source="changes", order_by="lsn", dedup=True):
         ORDER BY customer_id, valid_from
     """).df()
 
-U.check(as_tuples(history_variant()) == expected, "with the defaults, it gives your history")
-
 # %% [markdown]
-# Each experiment changes one thing. 🤔 **Predict** first, then run.
+# 🤔 **Predict** each experiment before you run it.
 #
-# 🧪 **A · Replay the whole feed twice** (a connector restart redelivers everything). Does the history change?
+# 🧪 **A · Receive every edit twice** (the copy job restarts and sends everything again). Does the history change?
 
 # %%
 con.sql("CREATE OR REPLACE VIEW replayed AS SELECT * FROM changes UNION ALL SELECT * FROM changes")
-U.check(as_tuples(history_variant("replayed")) == expected, "replaying the feed changes nothing: the pipeline is idempotent")
+U.check(as_tuples(history_variant("replayed")) == expected, "receiving everything twice changes nothing")
 
 # %% [markdown]
 # 🧪 **B · Reverse the arrival order** (last event first). Does it change?
@@ -645,9 +481,9 @@ wrong_order[wrong_order.customer_id == 101]
 
 # %% [markdown]
 # 🔍 The late `lsn` 18 (Riyadh) is treated as the newest change: customer 101 "moves back" to Riyadh **after** Jeddah,
-# the Jeddah version ends before it starts, Dammam's version now overlaps the Riyadh one (two cities at once), and the
-# current city is wrong. An older update applied after a newer one is called **state regression**; ordering by the log
-# position is the fix.
+# the Jeddah period ends before it starts, Dammam's period overlaps the Riyadh one (two cities at once), and the
+# current city is wrong. An older edit applied after a newer one is called **state regression**; ordering by `lsn` is
+# the fix.
 #
 # 🧪 **D · Skip the deduplication.** What appears for customer 101?
 
@@ -656,17 +492,18 @@ no_dedup = history_variant(dedup=False)
 no_dedup[no_dedup.customer_id == 101]
 
 # %% [markdown]
-# 🔍 Two Jeddah rows: the first one is valid from 08:00 **to** 08:00, a zero-length version that will double-count in
-# some joins and break uniqueness tests (Day 2).
+# 🔍 Two Jeddah rows: the first is valid from 08:00 **to** 08:00, a zero-length period that double-counts in some joins
+# and breaks uniqueness tests (Day 2).
 #
-# Now you have every piece of Lab 1.4: dedup by `lsn`, latest per key with `QUALIFY`, validity intervals with `lead`,
-# deletes dropped after the window, out-of-order detection with a frame.
+# This history table has a name: Day 1's last session calls it **SCD Type 2** (a *slowly changing dimension* that keeps
+# every period) and builds it for every Qafila customer in Lab 1.4, with the pieces you just used: dedup by `lsn`, latest
+# per key with `QUALIFY`, periods with `lead`, deletes dropped after the window, out-of-order detection with a frame.
 #
-# ## 8 · The same ideas on real data: courier events (15')
+# ## 8 · The same ideas on real data: courier events
 #
 # The courier app sends one event per delivery step: `assigned → picked_up → out_for_delivery → delivered` (or
-# `cancelled`, or `failed`). The feed has redelivered events (same `event_id`, sent twice) and late arrivals.
-# The table `courier` below has one row per event received; `event_ts` (given) is when the step happened, in UTC.
+# `cancelled`, or `failed`). The events include redelivered ones (same `event_id`, sent twice) and late arrivals.
+# `event_ts` is when the step happened, in UTC; `ingest_time` is when the event arrived.
 
 # %%
 con.sql(f"""
@@ -680,94 +517,55 @@ U.attach_app(con)
 con.sql("FROM courier WHERE order_id = (SELECT min(order_id) FROM courier) ORDER BY event_ts").df()
 
 # %% [markdown]
-# ✏️ **Exercise 8a** · Remove the redelivered copies: keep **one** row per `event_id` (the first one received, by
-# `ingest_time`). This is Task 3's deduplication, written with `QUALIFY`.
-# - **Result:** the view `courier_clean`, one row per `event_id`. The check counts it for you.
+# **Deduplicate** (§3, written with `QUALIFY`): one row per `event_id`, the first one received.
 
 # %%
-# Template:
-# con.sql("""
-#     CREATE OR REPLACE VIEW courier_clean AS
-#     SELECT * FROM courier
-#     QUALIFY row_number() OVER (PARTITION BY ___ ORDER BY ingest_time) = 1
-# """)
-# BEGIN SOLUTION
 con.sql("""
     CREATE OR REPLACE VIEW courier_clean AS
     SELECT * FROM courier
     QUALIFY row_number() OVER (PARTITION BY event_id ORDER BY ingest_time) = 1
 """)
-# END SOLUTION
-n_raw, n_ids, n_clean = con.sql("""
-    SELECT (SELECT count(*) FROM courier), (SELECT count(DISTINCT event_id) FROM courier), (SELECT count(*) FROM courier_clean)
-""").fetchall()[0]
+n_raw, n_clean = con.sql("SELECT (SELECT count(*) FROM courier), (SELECT count(*) FROM courier_clean)").fetchall()[0]
 print(f"{n_raw:,} events received -> {n_clean:,} after dedup")
-U.check(n_clean == n_ids < n_raw, f"{n_raw - n_clean} redelivered copies removed")
 
 # %% [markdown]
-# ✏️ **Exercise 8b** · Find the **status** of every order: the `event_type` of its **latest** event, by when it
-# happened (`event_ts`). This is Exercise 6 on real data.
-# - **Result:** `status`, one row per `order_id`, columns `order_id`, `event_type`, read from `courier_clean`.
-# - **Check yourself:** every order the app marks as `delivered` ends with a `delivered` event.
+# **Latest per key** (§6): each order's status is the `event_type` of its latest event, by when it happened.
 
 # %%
-# Template:
-# status = con.sql("""
-#     SELECT order_id, event_type
-#     FROM courier_clean
-#     QUALIFY row_number() OVER (PARTITION BY ___ ORDER BY ___ DESC) = 1
-# """).df()
-# BEGIN SOLUTION
 status = con.sql("""
     SELECT order_id, event_type
     FROM courier_clean
     QUALIFY row_number() OVER (PARTITION BY order_id ORDER BY event_ts DESC) = 1
 """).df()
-# END SOLUTION
+delivered = set(con.sql("SELECT order_id FROM app.orders WHERE status = 'delivered'").df().order_id)
+U.check(set(status[status.order_id.isin(delivered)].event_type) == {"delivered"}, "orders the app says are delivered end in 'delivered'")
 status.event_type.value_counts()
 
-# %%
-delivered = set(con.sql("SELECT order_id FROM app.orders WHERE status = 'delivered'").df().order_id)
-U.check(len(status) == status.order_id.nunique(), "one status per order")
-U.check(set(status[status.order_id.isin(delivered)].event_type) == {"delivered"}, "orders the app says are delivered end in 'delivered'")
-
 # %% [markdown]
-# ✏️ **Exercise 8c** · For every event, compute `minutes`: how long the order stayed at that step, i.e. the time from
-# this event to the **next** event of the same order. The last event of an order has no next event, so `NULL`.
-# This is Exercise 4 on real data.
-# - **Result:** `stages`, one row per event of `courier_clean`, columns `order_id`, `store_id`, `event_type`,
-#   `minutes`. `date_diff('second', a, b) / 60` (given) turns two timestamps into minutes.
-# - **Check yourself:** final events (`delivered`, `cancelled`, `failed`) have `minutes` = `NULL`.
+# **The next row** (§4): how long an order stayed at each step is the time to the next event of the same order. Final
+# events (`delivered`, `cancelled`, `failed`) have no next event, so `NULL`.
 
 # %%
-# Template:
-# stages = con.sql("""
-#     SELECT order_id, store_id, event_type,
-#            date_diff('second', event_ts, lead(___) OVER (PARTITION BY ___ ORDER BY ___)) / 60 AS minutes
-#     FROM courier_clean
-# """).df()
-# BEGIN SOLUTION
 stages = con.sql("""
     SELECT order_id, store_id, event_type,
            date_diff('second', event_ts, lead(event_ts) OVER (PARTITION BY order_id ORDER BY event_ts)) / 60 AS minutes
     FROM courier_clean
 """).df()
-# END SOLUTION
 stages.head()
 
 # %% [markdown]
-# With `stages` you can answer an operations question: at which store do orders wait longest for a courier to pick
-# them up (median minutes in the `assigned` step)?
+# That answers an operations question: at which store do orders wait longest for a courier to pick them up (median
+# minutes in the `assigned` step)?
 
 # %%
 pickup_wait = stages[stages.event_type == "assigned"].groupby("store_id").minutes.median().sort_values(ascending=False)
 print(pickup_wait.round(1).head(4).to_string())
-U.check(stages[stages.event_type.isin(["delivered", "cancelled", "failed"])].minutes.isna().all(), "final events have no next event")
-U.check(pickup_wait.index[0] == "RUH-01", "RUH-01 is the busy store: pickups wait longest")
 
 # %% [markdown]
-# 🧪 **One more experiment** · 🤔 **Predict**: if you take each order's latest event by **arrival** (`ingest_time`)
-# instead of by when it happened (`event_ts`), will any order get a different status?
+# 🔍 RUH-01 is the busy store: its pickups wait longest.
+#
+# 🧪 🤔 **Predict** · If you take each order's latest event by **arrival** (`ingest_time`) instead of by when it
+# happened (`event_ts`), will any order get a different status?
 
 # %%
 by_arrival = con.sql("""
@@ -782,20 +580,46 @@ print(n_wrong, "orders get the wrong status when ordered by arrival")
 # 🔍 A courier's phone that was offline in a basement car park sends its events late, so an older step can **arrive**
 # after a newer one. Same lesson as experiment C: order by when it happened, never by when it arrived.
 #
+# ## 9 · Summary
+#
+# | | |
+# |---|---|
+# | **It does** | an aggregate or a neighbour's value next to every row, without collapsing rows or a self-join · rank, dedupe and keep the latest per key · running totals and "everything before me" |
+# | **It doesn't** | filter in `WHERE` (windows run after it: use `QUALIFY` or a subquery) · break ties for you (`row_number` on a tie is arbitrary) · see other partitions |
+# | **In this course** | dedup, latest state and city history (SCD Type 2) from the customer edits (Lab 1.4) · Polars' `.over()` (Lab 2.1) · latest state per key in streaming (Lab 3.4) |
+# | **In other engines** | the same `OVER (...)` in PostgreSQL, Snowflake, BigQuery, Spark SQL and Databricks; `QUALIFY` everywhere except PostgreSQL |
+#
+# **Cheat sheet**
+#
+# | Code | Does |
+# |---|---|
+# | `f(x) OVER (PARTITION BY k)` | the group's answer on every row of the group |
+# | `... OVER (PARTITION BY k ORDER BY t)` | a running answer: from the start of the partition up to the row (and its peers) |
+# | `row_number()`, `rank()`, `dense_rank()` | 1, 2, 3 · 1, 1, 3 · 1, 1, 2 on a tie |
+# | `QUALIFY row_number() OVER (PARTITION BY k ORDER BY t DESC) = 1` | the latest row per key; `PARTITION BY id` keeps one copy per id |
+# | `lag(x)`, `lead(x)`, `lag(x, 1, default)` | the previous / next row's value, `NULL` at the edges |
+# | `lead(changed_at) OVER (PARTITION BY k ORDER BY lsn)` | when a period ends: its `valid_to` |
+# | `ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING` | everything before me |
+# | `ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING` | my neighbours and me |
+# | `WINDOW w AS (...)`, then `OVER w` | one window shared by several functions |
+#
 # ## Checkpoint
 #
 # 1. In one sentence each: what does `PARTITION BY` decide, what does the `ORDER BY` inside `OVER` decide, and what does
 #    the frame decide?
 # 2. Why is `row_number() ... = 1` dangerous on tied rows that differ, and what are two ways to make it safe?
-# 3. Why must the delete markers be removed **after** `lead`, and which clause does that?
-# 4. Your history query runs twice on the same feed. Why is the result identical, and which line makes it so?
+# 3. Why must the delete rows be removed **after** `lead`, and which clause does that?
+# 4. Your history query runs twice on the same edits. Why is the result identical, and which line makes it so?
 #
-# ## 🖼️ Visual summary
+# Next: Day 1's last session, change data capture and SCD Type 2, and its [Lab 1.4](D1_4_cdc_merge_scd.ipynb). Docs:
+# [window functions](https://duckdb.org/docs/stable/sql/functions/window_functions) ·
+# [`QUALIFY`](https://duckdb.org/docs/stable/sql/query_syntax/qualify) ·
+# [`WINDOW`](https://duckdb.org/docs/stable/sql/query_syntax/window).
 #
-# The pictures below are drawn from the tables and queries of this lab. Use them as a reference sheet.
+# **What you built**, drawn from the tables and queries above, as a reference sheet.
 #
-# **1 · `GROUP BY` vs `OVER`.** Grouping replaces each customer's rows with one row; a window keeps every row and writes
-# the group's answer next to it (outlined: the column the window computed).
+# **`GROUP BY` vs `OVER`.** Grouping replaces each customer's rows with one row; a window keeps every row and writes the
+# group's answer next to it (outlined: the column the window computed).
 
 # %%
 V.table_steps([
@@ -808,8 +632,8 @@ V.table_steps([
 ], color_by="customer_id")
 
 # %% [markdown]
-# **2 · A window function, step by step: latest change per customer.** Partition, order inside each partition, number
-# the rows, then `QUALIFY` keeps number 1. Nothing is physically re-sorted; the steps are how to think about it.
+# **Latest change per customer, step by step.** Partition, order inside each partition, number the rows, then `QUALIFY`
+# keeps number 1. Nothing is physically re-sorted; the steps are how to think about it.
 
 # %%
 step = con.sql("""
@@ -826,8 +650,8 @@ V.table_steps([
 ], color_by="customer_id")
 
 # %% [markdown]
-# **3 · Frames.** For one current row (order 6), which rows each frame lets the aggregate see. `RANGE` (the default)
-# pulls in order 7 because it has the same date.
+# **Frames.** For one current row (order 6), the rows each frame lets the aggregate see. `RANGE` (the default) pulls in
+# order 7 because it has the same date.
 
 # %%
 V.frames(frames[["order_id", "created_at", "amount", "rows_running", "default_frame", "before_me", "neighbours"]],
@@ -836,19 +660,19 @@ V.frames(frames[["order_id", "created_at", "amount", "rows_running", "default_fr
                  "ROWS BETWEEN\nUNBOUNDED PRECEDING\nAND 1 PRECEDING", "ROWS BETWEEN\n1 PRECEDING\nAND 1 FOLLOWING"])
 
 # %% [markdown]
-# **4 · Logical evaluation order.** Windows are computed after `WHERE`, `GROUP BY` and `HAVING`; `QUALIFY` filters on them.
+# **Logical evaluation order.** Windows are computed after `WHERE`, `GROUP BY` and `HAVING`; `QUALIFY` filters on them.
 
 # %%
 V.evaluation_order()
 
 # %% [markdown]
-# **5 · SCD2 validity intervals.** Each version runs until the next change of the same customer (`lead` by `lsn`).
-# Top: the correct history. Below it, the three ways to get it wrong from Tasks 6 and 7.
+# **A customer's city history.** Each period runs until the next change of the same customer (`lead` by `lsn`). Top: the
+# correct history; below it, the three ways to get it wrong from §6 and §7.
 
 # %%
 V.timelines([
     ("Correct: dedup, lead by lsn, deletes dropped after the window (QUALIFY)", history),
     ("Deletes dropped too early (WHERE): customer 103 never leaves", too_early),
     ("Ordered by arrival: lsn 18 overwrites Jeddah, and Dammam overlaps Riyadh (state regression)", wrong_order),
-    ("No dedup: a zero-length Jeddah version", no_dedup),
+    ("No dedup: a zero-length Jeddah period", no_dedup),
 ], until="2026-09-24")

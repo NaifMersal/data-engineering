@@ -18,7 +18,7 @@ uv run jupyter lab
 ```
 Run `00_setup_check.ipynb` once before Day 1: it builds the shared warehouse, downloads the Day 4 embedding model and smoke-tests DuckDB, Iceberg and dbt.
 
-New to SQL window functions? Work through `00_sql_windows.ipynb` before Day 1 (self-paced, about 90 minutes). It builds `PARTITION BY`, ranking, `LAG`/`LEAD`, frames and `QUALIFY` up from tables small enough to check by eye, and finishes with you deriving the CDC and SCD2 queries that Lab 1.4 needs.
+New to SQL window functions? Walk through `00_sql_windows.ipynb` before Day 1 (self-paced, about 60 minutes, no exercises). It builds `PARTITION BY`, ranking, `LAG`/`LEAD`, frames and `QUALIFY` up from tables small enough to check by eye, and ends with a customer's city history: the table Day 1's last session names SCD Type 2 and Lab 1.4 builds at scale.
 
 **Spark** (`tools/spark.ipynb` and Lab 3.2) needs Java 17+. On Colab the notebook installs it. Locally, install a JDK (for example [Temurin 21](https://adoptium.net/)), set `JAVA_HOME`, then `uv sync --extra spark`. On native Windows, Spark also needs `winutils.exe` to write files, so Windows users should run the Spark notebooks on Colab (or in WSL).
 
