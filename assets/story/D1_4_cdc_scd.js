@@ -22,7 +22,7 @@ const v2=(x,y,w,cls='src')=>rec('v2',x,y,w,'customer 100898','Dammam · Al Nuzha
 const now=(x,y,w)=>rec('now',x,y,w,'customer 100898','Jeddah · Al Hamra · yahoo email','','src');
 const copy=(x,y,w,body='Jeddah · Al Hamra',cls='copy')=>rec('snap',x,y,w,'our copy · 100898',body,'',cls);
 const order534=(x,y,w)=>rec('o534',x,y,w,'order 5019534','27 Aug · DMM-01, Dammam · delivered','98.44','order');
-const fin=(x,y,w,ask='“Revenue by customer city?”')=>art('analyst',x,y,w,'Finance',ask,'f-fin');
+const fin=(x,y,w,ask='“Spend by customer city?”')=>art('analyst',x,y,w,'Marketing',ask,'f-fin');
 
 add('Day 1 · Session 4','Change data capture and history','',
 svg(path('M230 114 L230 162','em')+path('M230 244 L230 292','em'))+v1(20,40,440)+ev('e086',20,170,440)+now(20,300,440)+art('customer',500,70,210,'Customer 100898','Dammam → Jeddah','f-cust'),
@@ -56,20 +56,20 @@ label('the app · today',0,14,'off',440,'tk-app')+now(0,40,440)+label('our copy 
 fin(0,190,170)+note('Every report on our copy puts 100898 in Dammam.',230,240,'red',1210)+
 label('September: <b>6,158</b> changes to <b>4,542</b> customers',230,330,'check',1210,'counts')+note('Which rows changed, and how do we find out?',230,400,'teal',1210),
 '<strong>A copy goes stale</strong> the moment the source changes. We need to learn every change.',
-'Our copy is the 1 September snapshot (data/raw/cdc/customers_snapshot_2026-09-01.csv): 6,060 customers. By 30 September the app has 7,442, and 4,542 customers changed in some way: they signed up, edited their profile or were erased. Finance reports revenue by customer city from our copy, so every one of 100898’s orders still counts as Dammam. Ask the room how they would find out which rows changed.');
+'Our copy is the 1 September snapshot (data/raw/cdc/customers_snapshot_2026-09-01.csv): 6,060 customers. By 30 September the app has 7,442, and 4,542 customers changed in some way: they signed up, edited their profile or were erased. Marketing reports spend by customer city from our copy, so every one of 100898’s orders still counts as Dammam. Ask the room how they would find out which rows changed.');
 
 // 02 · Capturing change: three ways, one per click.
 const WT='How do we learn what changed?',WS='Three ways. Each one sees customer 100898’s evening differently.';
 const way1=()=>label('<b>Copy it all again, compare</b><br>a full snapshot every night',0,10,'reason',330,'r1')+rec('see1',370,10,520,'next night: one difference','Dammam → Jeddah, and a new email','','chg')+note('The 17:15 version is never seen. Reads every row, every night.',940,5,'',500);
-const way2=()=>label('<b>Ask for recent rows</b><br>updated_at after the last run: dlt’s cursor (D1_3)',0,175,'reason',330,'r2')+rec('see2',370,175,520,'next run: the row as it is now','Jeddah · Al Hamra · updated 18:49','','chg')+note('A deleted row has no updated_at: 159 erasures never seen',940,170,'red',500);
+const way2=()=>label('<b>Ask for recent rows</b><br>updated_at after the last run: dlt’s cursor (D1_3)',0,175,'reason',330,'r2')+rec('see2',370,175,520,'next run: the row as it is now','Jeddah · Al Hamra · updated 18:49','','chg')+note('Hard delete: the row is gone. 159 erasures never seen',940,160,'red',500)+note('Soft delete: just a flag, so it’s seen',940,240,'',500);
 const way3=()=>label('<b>Read the database’s log</b><br>every change, as it is written',0,340,'reason',330,'r3')+ev('e670',370,340,250)+ev('e086',640,340,250)+note('Every insert, update and delete, in order, within seconds',940,335,'teal',500);
 add('02 / Capturing change',WT,WS,way1(),
 'Way 1: <strong>compare full copies.</strong> Simple, but heavy, and it sees only the net change.',
 'A build: one way per click. Snapshot diff: copy the whole table every night and compare with yesterday’s copy. Fine for small tables, but it reads every row every time, and it sees only the net change per night: the 17:15 version, with the new email but the old city, never shows up.');
 
 add('02 / Capturing change',WT,WS,way1()+way2(),
-'Way 2: <strong>ask for rows changed since the last run.</strong> Cheap, but blind to deletes.',
-'Query-based: WHERE updated_at > the last cursor. This is exactly what dlt’s incremental cursor did in D1_3. It is cheap and it works for many tables, but it misses hard deletes (the row is gone, so nothing matches), any change that doesn’t touch updated_at, and every version between two runs.');
+'Way 2: <strong>ask for rows changed since the last run.</strong> Cheap, but blind to hard deletes.',
+'Query-based: WHERE updated_at > the last cursor. This is exactly what dlt’s incremental cursor did in D1_3. It is cheap and it works for many tables, but it misses hard deletes (the row is gone, so nothing matches), any change that doesn’t touch updated_at, and every version between two runs. A soft delete is different: the app keeps the row and sets is_deleted = 1, an ordinary update, so the cursor sees it (492 in September). Every consumer then has to filter those rows out.');
 
 add('02 / Capturing change',WT,WS,svg(outline(350,318,1090,112,'teal','best'))+way1()+way2()+way3(),
 '<strong>Change data capture (CDC):</strong> learning every change a source makes. Reading its log is the complete way.',
@@ -174,83 +174,74 @@ note('20 customers signed up and were erased within September: not found, op = d
 '<strong>MERGE</strong> updates, inserts and deletes by key, in one statement. DuckDB, Spark, Iceberg, Snowflake and BigQuery all run it.',
 'The branches are checked top to bottom for each source row. The counts are Lab 1.4’s: of 4,542 latest changes, 139 delete a snapshot row, 2,862 update one, 1,521 insert a new customer, and 20 are deletes of customers created during September, which no branch matches. Run twice on the same batch, the MERGE changes nothing the second time: it is idempotent, so a re-run after a failure is safe.',['merge','lab']);
 
-add('07 / Reconcile','Prove the copy matches the app','Compare every column of every row with app.customers, in both directions.',
+add('07 / Reconcile','Did we get it right? Compare with the app','Every column of every row, in both directions.',
 box('app.customers','<div class="data-row"><span>rows</span><span>7,442</span></div>',0,20,380,'','rc-src','the app database, 30 September')+label('<b>✓</b> rows: 7,442 = 7,442',450,30,'check',560,'ck1')+label('<b>✓</b> missing (app EXCEPT copy): 0',450,95,'check',560,'ck2')+label('<b>✓</b> extra (copy EXCEPT app): 0',450,160,'check',560,'ck3')+box('Our copy','<div class="data-row"><span>rows</span><span>7,442</span></div>',1060,20,380,'silver','rc-copy','snapshot + MERGE')+
-note('Order by arrival instead: missing 1, extra 1. It’s customer 100898.',0,300,'red',1100)+note('Run it on a schedule, and alert when it isn’t zero',0,370,'teal',1100),
+note('Order by arrival instead: missing 1, extra 1. It’s customer 100898.',0,300,'red',1100)+note('Equal counts aren’t enough: both orders give 7,442 rows.',0,370,'teal',1100),
 '<strong>Reconcile:</strong> compare the copy with its source, row by row. The one test that catches 100898.',
-'Lab 1.4 task 3: EXCEPT compares whole rows, so one wrong column in one row shows up as one missing and one extra. Equal counts alone would have passed: 7,442 rows either way. In production the source is live, so compare as of the same lsn, or tolerate rows changed since the last batch.',['lab']);
+'Lab 1.4 task 3: EXCEPT compares whole rows, so one wrong column in one row shows up as one missing and one extra. Equal counts alone would have passed: 7,442 rows either way. In production the same check runs on a schedule against a live source, so it compares as of the same lsn. D2_2 reconciles the fact table the same way.',['lab']);
 
-add('08 / Deletes','A customer leaves: hard or soft delete','Two ways an app can record that a customer is gone. Both appear in September’s feed.',
-label('<b>Hard delete</b> · the row is gone',0,0,'reason',680,'dh')+label('<b>Soft delete</b> · the row stays, flagged',760,0,'reason',680,'ds')+
-rec('del710',0,60,680,'lsn 5051530 · op d','customer 100710 · after: null','','chg')+rec('soft',760,60,680,'lsn 5000808 · op u','customer 105416 · is_deleted 0 → 1','','chg')+
-label('<b>159</b> in September',0,160,'check',680,'n-hard')+label('<b>492</b> in September',760,160,'check',680,'n-soft')+
-note('Only the log sees it. MERGE deletes the row.',0,220,'',680)+note('An ordinary update, easy to copy. Every query must filter it.',760,220,'',680)+
-note('Decide per layer. Often: bronze keeps every event, silver applies hard deletes, reports drop soft-deleted rows.',0,380,'teal',1440),
-'<strong>Hard delete</strong> removes the row; <strong>soft delete</strong> flags it. Decide how each layer shows both.',
-'Customer 100710 was deleted on 13 September: the event has a before image and after = null. 492 updates in September set is_deleted to 1; the app keeps those rows, and every consumer must remember to filter them. In Kafka (Day 3), Debezium follows a delete with a tombstone, the same key with no value, so that log compaction can forget the key. PDPL erasure requests are hard deletes, and they must reach every copy: the last boards come back to this.',['debezium']);
+// 08 · History
+const HT='Marketing asks: how much did Dammam customers spend?',HS='Each order counted by where its customer lived at the time. Order 5019534 is customer 100898’s, from 27 August.';
+const histJoin=()=>svg(path('M702 95 L996 95','danger','w-o'))+fin(0,30,200)+order534(260,60,440)+label('JOIN ON customer_id',740,40,'code',260,'j1')+copy(1000,60,440)+note('98.44 SAR from a Dammam customer, counted as Jeddah',1000,150,'red',440);
+add('08 / History',HT,HS,histJoin(),
+'Joined to our copy, <strong>a Dammam customer’s order counts as Jeddah</strong>: that is where 100898 lives now.',
+'Order 5019534 is real: delivered on 27 August from DMM-01, 98.44 SAR. Joined to the current-state copy, it counts toward Jeddah customers, because that’s where the customer lives today. Sometimes that’s the right question (“where do our customers live now?”). For “how much did Dammam customers spend?”, we need the city they lived in when they ordered. If someone asks “why not use the store?”: the store answers where we sold, which is a different question. In September, 10% of delivered orders (2,173 of 21,005) came from a store in a different city from the one the customer lived in.',['lab']);
 
-// 09 · History
-const HT='Finance asks: where did we sell order 5019534?',HS='Revenue by customer city. The order is customer 100898’s, delivered from Dammam on 27 August.';
-const histJoin=()=>svg(path('M702 95 L996 95','danger','w-o'))+fin(0,30,200)+order534(260,60,440)+label('JOIN ON customer_id',740,40,'code',260,'j1')+copy(1000,60,440)+note('98.44 SAR of Dammam sales, counted in Jeddah',1000,150,'red',440);
-add('09 / History',HT,HS,histJoin(),
-'Joined to our copy, <strong>a Dammam sale counts as Jeddah</strong>: that is where 100898 lives now.',
-'Order 5019534 is real: delivered on 27 August from DMM-01, 98.44 SAR. Joined to the current-state copy, it counts as a Jeddah sale, because that’s where the customer lives today. Sometimes that’s the right question (“where are our customers now?”). For “where did we sell?”, we need the city at order time.',['lab']);
-
-add('09 / History',HT,HS,histJoin()+label('before 17:15',260,264,'off',540,'tk-v1')+label('before 18:49',840,264,'off',600,'tk-v2')+v1(260,290,540,'src gone')+v2(840,290,600,'src gone')+note('MERGE overwrote these rows. The answer was in them.',260,390,'',1180),
+add('08 / History',HT,HS,histJoin()+label('before 17:15',260,264,'off',540,'tk-v1')+label('before 18:49',840,264,'off',600,'tk-v2')+v1(260,290,540,'src gone')+v2(840,290,600,'src gone')+note('MERGE overwrote these rows. The answer was in them.',260,390,'',1180),
 '<strong>MERGE keeps only now.</strong> Questions about the past need the versions it overwrote.',
-'Our copy went through the same overwrites as the app. The 1 September row, Dammam, is exactly what finance needs for an August order, and the MERGE replaced it.');
+'Our copy went through the same overwrites as the app. The 1 September row, Dammam, is exactly what marketing needs for an August order, and the MERGE replaced it.');
 
-// SCD2, version by version (slides 28–30); the same ids return on the as-of join.
+// SCD2, version by version (slides 27–29); the same ids return on the as-of join.
 const VER=[['v1','Dammam · Al Nuzha','2025-08-14 04:31','2026-09-02 17:15'],['v2','Dammam · Al Nuzha','2026-09-02 17:15','2026-09-02 18:49'],['v3','Jeddah · Al Hamra','2026-09-02 18:49','null · current']];
 const versions=(n=3)=>VER.slice(0,n).map(([id,head,from,to],i)=>label(`version ${i+1}`,480*i,14,'off',440,`vn${i}`)+rec(id,480*i,40,440,head,`from ${from}<br>to ${i===n-1?'null · current':to}`,'','copy')).join('');
 const VT='Keep every version instead',VS='Add a row for each change. A version is valid from its change until the next one.';
-add('10 / History',VT,VS,versions(1)+note('From the 1 September snapshot. Nothing has changed it yet.',0,160,'',440),
+add('09 / History',VT,VS,versions(1)+note('From the 1 September snapshot. Nothing has changed it yet.',0,160,'',440),
 'Version 1 comes from the snapshot. While nothing changes it, it is the <strong>current</strong> version.',
 'A build of Lab 1.4 task 4. Snapshot rows become the first versions, valid from their updated_at: 100898 signed up on 14 August 2025 and hadn’t changed since. valid_to null means current.',['lab']);
 
-add('10 / History',VT,VS,svg(path('M700 196 L700 146','em','w-e1'))+versions(2)+ev('e670',480,200,440)+note('Same city: only the email changed',0,160,'',440),
+add('09 / History',VT,VS,svg(path('M700 196 L700 146','em','w-e1'))+versions(2)+ev('e670',480,200,440)+note('Same city: only the email changed',0,160,'',440),
 'A change <strong>closes</strong> the current version and <strong>opens</strong> a new one.',
 'The 17:15 event starts version 2 at its commit time, and version 1 now ends there. Version 2 has the same city, because the change was to the email: an SCD2 row records every change, not only the ones a report cares about.',['lab']);
 
-add('10 / History',VT,VS,svg(path('M700 196 L700 146','em','w-e1')+path('M1180 196 L1180 146','em','w-e2'))+versions(3)+ev('e670',480,200,440)+ev('e086',960,200,440)+
+add('09 / History',VT,VS,svg(path('M700 196 L700 146','em','w-e1')+path('M1180 196 L1180 146','em','w-e2'))+versions(3)+ev('e670',480,200,440)+ev('e086',960,200,440)+
 label('valid_to = lead(valid_from) OVER (PARTITION BY customer_id ORDER BY lsn)',0,330,'code',1440,'sql')+note('Each version ends where the next begins: no gaps, no overlaps. Ordered by lsn, so arrival order can’t spoil it.',0,400,'teal',1440),
 '<strong>Three versions,</strong> and exactly one is valid at any moment.',
 'lead() over lsn closes each version where the next begins, so out-of-order arrival doesn’t matter, and the duplicate was already dropped. A delete closes the last version and starts nothing.',['lab','windows']);
 
-add('10 / History','A slowly changing dimension','A dimension describes things, such as customers. Its rows change now and then. How much history to keep is a choice.',
+add('09 / History','A slowly changing dimension','A dimension describes things, such as customers. Its rows change now and then. How much history to keep is a choice.',
 tbl('types',0,0,900,'Slowly changing dimensions (SCD)','80px 1fr 1fr',[{c:['type','keeps','answers'],cls:'h'},['0','the first value','city at sign-up'],['1','the latest value: our MERGE copy','city now'],{c:['2','a row per version','city at order time'],cls:'hit'}],'prose')+
 label('<b>12,059</b> versions for 7,601 customers',960,10,'check',480,'sc1')+label('<b>7,442</b> current: one per live customer ✓',960,75,'check',480,'sc2')+note('Many teams keep Type 1 and Type 2 side by side.',960,150,'teal',480)+
 note('Dimensions return on Day 2, when we model the warehouse.',0,300,'',1440),
 '<strong>SCD Type 2:</strong> one row per version, with valid_from and valid_to. Type 1 is our MERGE copy.',
 'Lab 1.4 task 4’s counts: 12,059 versions for 7,601 customers (the 159 erased customers have versions but no current one), and 7,442 current rows, one per customer in the app. Type 0 never changes (the sign-up city); Type 1 overwrites (the copy we built with MERGE); Type 2 keeps every version. The choice can differ per column: history for city, overwrite for a typo in a name.',['scd2','lab']);
 
-add('10 / As-of join','Join each order to the version valid at its time','Order 5019534 was placed on 27 August. Which of customer 100898’s versions was valid then?',
-svg(path('M220 248 L220 146','em','w-asof'))+versions()+order534(0,250,440)+label('✓ Dammam',240,180,'ptr teal',150,'asof-ok')+note('27 August falls inside version 1: Dammam, the city the order was delivered from.',520,265,'teal',920)+
+add('09 / As-of join','Join each order to the version valid at its time','Order 5019534 was placed on 27 August. Which of customer 100898’s versions was valid then?',
+svg(path('M220 248 L220 146','em','w-asof'))+versions()+order534(0,250,440)+label('✓ Dammam',240,180,'ptr teal',150,'asof-ok')+note('27 August falls inside version 1: 100898 lived in Dammam then.',520,265,'teal',920)+
 label('ON o.customer_id = v.customer_id AND o.created_at &gt;= v.valid_from AND (o.created_at &lt; v.valid_to OR v.valid_to IS NULL)',0,410,'code',1440,'sql'),
 '<strong>As-of join:</strong> match each event to the version that was valid when it happened.',
-'Order 5019534 (27 August) falls inside version 1, so the as-of join gives Dammam, matching the store it was delivered from. The join condition is on the board: the order time must be at or after the version’s start and before its end, or the version must still be open.',['lab']);
+'Order 5019534 (27 August) falls inside version 1, so the as-of join gives Dammam, where the customer lived then. The join condition is on the board: the order time must be at or after the version’s start and before its end, or the version must still be open.',['lab']);
 
-add('10 / As-of join','Finance gets two answers, both correct','September’s delivered revenue by customer city, at order time and by current city (SAR).',
+add('09 / As-of join','Marketing gets two answers, both correct','September’s delivered revenue by customer city, at order time and by current city (SAR).',
 fin(0,30,200,'“Which one do I report?”')+tbl('by-city',300,0,1140,'September revenue by customer city','1fr 1fr 1fr 120px',[{c:['city','at order time','current city','diff'],cls:'h'},['Dammam','625,733','661,985','+5.8%'],['Jeddah','1,024,139','1,028,157','+0.4%'],['Riyadh','1,680,589','1,640,319','−2.4%']],'sums')+
-note('650 customers moved city in September. The total stays 3,330,461 SAR; only the split moves.',300,250,'',1140)+note('For a city manager paid on city revenue, a few percent is the whole conversation.',300,350,'teal',1140),
-'<strong>As-of</strong> answers “where did we sell”; <strong>current</strong> answers “where do our customers live now”.',
+note('650 customers moved city in September. The total stays 3,330,461 SAR; only the split moves.',300,250,'',1140)+note('If campaign budgets are split by customer city, a few percent is real money.',300,350,'teal',1140),
+'<strong>As-of:</strong> where customers lived when they ordered. <strong>Current:</strong> where they live now. Where we sold comes from the store.',
 'Lab 1.4 task 5. The totals are equal (3,330,461 SAR); 650 movers shift money between cities. Which number is right depends on the question, so the model should offer both. Orders of erased customers fall out of both joins: Day 2’s star schema keeps them with an Unknown row.',['lab']);
 
-// 11 · Erasure
+// 10 · Erasure
 const ET='Compliance asks: is customer 100710 gone?',ES='Customer 100710 asked to be erased; the app deleted the row on 13 September. Our history still has it.';
 const erased=()=>art('steward',0,20,190,'Compliance','“Erased everywhere?”','f-cmp')+label('version 1',230,14,'off',390,'xn0')+label('version 2',630,14,'off',390,'xn1')+label('version 3 · closed by the delete',1030,14,'off',410,'xn2')+
 rec('x1',230,40,390,'Riyadh · Al Naseem','mobile 05•••••868<br>to 2026-09-06 11:38','','copy')+rec('x2',630,40,390,'Riyadh · Al Yasmin','mobile 05•••••868<br>to 2026-09-06 22:07','','copy')+rec('x3',1030,40,410,'Riyadh · Al Yasmin','mobile 05•••••360<br>to 2026-09-13 02:32','','copy');
-add('11 / Erasure',ET,ES,erased()+note('Closed, not gone: three rows still hold the old mobile numbers',230,150,'red',1210),
+add('10 / Erasure',ET,ES,erased()+note('Closed, not gone: three rows still hold the old mobile numbers',230,150,'red',1210),
 '<strong>A delete closes the last version.</strong> The older versions still hold personal data.',
 'Customer 100710 had three versions in September (a district move and a new mobile number, both on 6 September) and asked to be erased on 13 September. The SCD2 build closes the last version at the delete and keeps the rest: their old mobile numbers are still there.',['lab']);
 
-add('11 / Erasure',ET,ES,erased()+note('Closed, not gone: three rows still hold the old mobile numbers',230,150,'red',1210)+
+add('10 / Erasure',ET,ES,erased()+note('Closed, not gone: three rows still hold the old mobile numbers',230,150,'red',1210)+
 label('<b>DELETE</b> every version of every erased customer: 200 versions, 159 customers',230,250,'check',1210,'er1')+label('<b>and</b> in the bronze feed and in old snapshots (Lab 4.3)',230,310,'check',1210,'er2')+label('<b>✓</b> 11,859 versions remain: history kept for everyone else',230,370,'check',1210,'er3'),
 '<strong>History meets erasure:</strong> under the PDPL, erased means every version, every layer, every snapshot.',
 'The PDPL gives every data subject the right to have their data destroyed, so Lab 1.4 deletes every version of the 159 erased customers. The change feed in bronze holds the same data, and so do old snapshots: Lab 4.3 handles that on a lakehouse table.',['lab']);
 
-const WORDS=[['CDC','learning every change a source makes'],['Log','where the database writes each change first'],['lsn','a change’s position in the log'],['Change event','one change: op, before, after, lsn'],['At-least-once','an event may arrive twice, or late'],['MERGE','update, insert or delete by key'],['Reconcile','prove the copy matches its source'],['Soft delete','a flag instead of removing the row'],['SCD Type 2','one row per version, valid_from to valid_to'],['As-of join','join to the version valid at the time']];
-add('12 / The words','Ten words for change and history','Every one appeared on a board today. The lab uses them all.',
+const WORDS=[['CDC','learning every change a source makes'],['Log','where the database writes each change first'],['lsn','a change’s position in the log'],['Change event','one change: op, before, after, lsn'],['At-least-once','an event may arrive twice, or late'],['MERGE','update, insert or delete by key'],['Reconcile','prove the copy matches its source'],['Upsert','update the row if the key exists, insert it if not'],['SCD Type 2','one row per version, valid_from to valid_to'],['As-of join','join to the version valid at the time']];
+add('11 / The words','Ten words for change and history','Every one appeared on a board today. The lab uses them all.',
 WORDS.map(([w,d],i)=>label(`<b>${w}</b> · ${d}`,i<5?0:740,(i%5)*100,'check',700,`w${i}`)).join(''),
 '<strong>Order by lsn:</strong> most of the other words depend on it.',
 'A reference board: point at each word and ask the room which board it appeared on, and what customer 100898 looked like there.');
@@ -261,20 +252,20 @@ const RECALL=[
  ['Khalid (107371) signed up on 26 September. Which MERGE branch handles that change?','NOT MATCHED → INSERT: the 1 September snapshot has no row for 107371.'],
  ['How many SCD2 versions does 100898 have, and which one is current?','Three: two in Dammam, then Jeddah · Al Hamra from 2 Sep 18:49, with valid_to null.'],
  ['Order 5019534 (27 Aug, DMM-01): which city does the as-of join give? The current join?','As-of: Dammam, the version valid on 27 August. Current: Jeddah.']];
-add('13 / Recall','Your turn: answer before you look','Five questions on today’s customers. Answer out loud, or with a neighbour.',
+add('12 / Recall','Your turn: answer before you look','Five questions on today’s customers. Answer out loud, or with a neighbour.',
 recall(RECALL),
 '<strong>Say it without the board:</strong> what you can recall now, you can use in the lab.',
 'About 3 minutes. Read each question, give the room 20–30 seconds, and take an answer before moving on. Don’t reveal until people have committed to an answer: the guess that turns out wrong is what makes the right answer stick. The next slide fills in all five answers in place.');
 
-add('13 / Recall','Your turn: the answers','Check yours. If one surprised you, go back to its board.',
+add('12 / Recall','Your turn: the answers','Check yours. If one surprised you, go back to its board.',
 recall(RECALL,true),
 '<strong>Capture every change, order by lsn, MERGE the latest, keep the versions:</strong> the whole session in one line.',
-'Walk through any answer the room missed by going back to its board: the three ways (6–8), arrival vs. lsn (14–16), MERGE (19–23), the versions (28–30) and the as-of join (32).');
+'Walk through any answer the room missed by going back to its board: the three ways (6–8), arrival vs. lsn (14–16), MERGE (19–23), the versions (27–29) and the as-of join (31).');
 
 add('Lab 1.4 · 25 min','From a CDC feed to an SCD2 dimension','Start from the 1 September snapshot, replay September’s changes, and end exactly where the app is.',
 `<div class="references"><div><h3>Lab 1.4 · 25 minutes</h3><p>1 · Read the feed; find duplicates and late events · 4′</p><p>2 · Latest change per key; MERGE · 7′</p><p>3 · Reconcile with the app (0 differences) · 4′</p><p>4 · Build the SCD2 history · 7′</p><p>5 · As-of join: revenue by city at order time · 3′</p><p class="note">✱ Make the MERGE incremental: the feed in 4 batches. Find customer 100898 in the feed during task 1.</p></div><div><h3>Open</h3><div class="reference-list"><a href="${sources.lab}" target="_blank" rel="noopener">Lab · D1_4_cdc_merge_scd.ipynb</a><a href="${sources.windows}" target="_blank" rel="noopener">Lab 0 · SQL window functions</a><a href="${sources.debezium}" target="_blank" rel="noopener">Further reading · Debezium change events</a><a href="../index.html">Back to the course page</a></div></div></div>`,
 'Tomorrow, Day 2: from bronze to silver.',
-'Hand over to the lab. Suggest finding customer 100898 in the feed during task 1, and trying the arrival-order MERGE in task 3 to see the one difference appear. The stretch task shows why real CDC sinks keep tombstones: a delete in an early batch, followed by an older update in a later batch, re-inserts the customer unless the sink remembers the delete’s lsn.',['lab','windows']);
+'Hand over to the lab. Suggest finding customer 100898 in the feed during task 1, and trying the arrival-order MERGE in task 3 to see the one difference appear. The stretch task shows why real CDC sinks remember deletes: a delete in an early batch, followed by an older update in a later batch, re-inserts the customer unless the sink remembers the delete’s lsn.',['lab','windows']);
 
 Story.start({brand:'QAFILA / CDC STORY',sources});
 })();
