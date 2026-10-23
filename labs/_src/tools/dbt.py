@@ -340,16 +340,38 @@ from dbt.cli.main import dbtRunner
 
 
 def dbt(*args, expect_success=True, log=True):
-    flags = ["--no-use-colors", "--no-send-anonymous-usage-stats"] + ([] if log else ["--log-level", "none"])
+    """Run a dbt command. log=True prints one line per model or test, "full" prints dbt's own log, False nothing."""
+    flags = ["--no-use-colors", "--no-send-anonymous-usage-stats"] + ([] if log == "full" else ["--log-level", "none"])
     # --log-path keeps dbt.log inside the project; without it dbt writes logs/ next to the notebook.
     paths = ["--project-dir", str(PROJ), "--profiles-dir", str(PROJ), "--log-path", str(PROJ / "logs")]
     result = dbtRunner().invoke([*flags, *args, *paths])
     command = "dbt " + " ".join(args)
+    if log is True:
+        summarize(result)
     if expect_success and not result.success:
-        raise RuntimeError(command + " failed: see the log above") from result.exception
+        raise RuntimeError(command + " failed" + ("" if log else ": run it again with log='full'")) from result.exception
     if log:
         U.check(result.success == expect_success, command + (" succeeded" if result.success else " failed, as expected"))
-    return result
+    return U.DbtResult(result)   # like dbt's result, without its page-long printout when a cell ends with dbt(...)
+
+
+def summarize(result):
+    """The lines of dbt's log that say something: each model or test with its status, then the totals."""
+    if result.exception is not None:
+        print("ERROR", result.exception)
+    results = getattr(result.result, "results", None)
+    if not results or result.result.args.get("which") not in ("run", "build", "test"):
+        return
+    counts = {"PASS": 0, "WARN": 0, "ERROR": 0, "SKIP": 0}
+    for r in results:
+        status = str(r.status).upper()
+        status = {"SUCCESS": "OK", "FAIL": "ERROR", "SKIPPED": "SKIP"}.get(status, status)
+        ok = status in ("OK", "PASS")
+        counts["PASS" if ok else status] = counts.get("PASS" if ok else status, 0) + 1
+        kind = r.node.config.materialized if r.node.resource_type == "model" else r.node.resource_type
+        detail = f"  {r.message}" if not ok and r.message else ""
+        print(f"{status:5} {kind:11} {r.node.name}{detail}")
+    print("Done.", " ".join(f"{k}={v}" for k, v in counts.items()))
 
 
 def generated(kind, path):
@@ -357,7 +379,7 @@ def generated(kind, path):
     return (PROJ / "target" / kind / "qafila_intro" / path).read_text(encoding="utf-8")
 
 
-dbt("debug")
+dbt("debug", log="full")
 
 # %% [markdown]
 # 🔍 If a check fails: the adapter isn't installed, the profile name doesn't match, the path is wrong, or another
@@ -413,10 +435,14 @@ U.check(sql("FROM information_schema.tables WHERE table_name = 'stg_orders'").em
 # %%
 tables_before = sql("SELECT table_schema, table_name, table_type FROM information_schema.tables")
 schemas_before = set(sql("SELECT schema_name FROM information_schema.schemata").schema_name)
-dbt("run", "--select", "stg_orders")
+dbt("run", "--select", "stg_orders", log="full")
 tables_after = sql("SELECT table_schema, table_name, table_type FROM information_schema.tables")
 schemas_after = set(sql("SELECT schema_name FROM information_schema.schemata").schema_name)
 V.database_map(tables_after, before=tables_before)
+
+# %% [markdown]
+# 🔍 That is dbt's log, as a terminal shows it: a `START` and an `OK` line per model, then the totals. From here on
+# the notebook prints only the result lines: status, materialization, name.
 
 # %%
 V.sql_steps([
