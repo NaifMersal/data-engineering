@@ -23,6 +23,22 @@ DAYS = {
     4: ("Production: Orchestration, Reliability, Governance & AI", "purple"),
 }
 
+# done on your own before Day 1; solution: the notebook has a worked solution in labs/solutions/
+PREP = [
+    dict(title="Setup check", nb="00_setup_check",
+         topics="installs the packages, generates the data and tests every tool; run it once"),
+    dict(title="SQL window functions (if new to them)", nb="00_sql_windows", solution=True,
+         topics="self-paced, about 90 minutes: ranking, LAG/LEAD, frames, QUALIFY; Lab 1.4 builds on them"),
+]
+
+# the two decks that open Day 1, before D1_1
+OPENING = [
+    dict(title="Course introduction", deck="00_intro",
+         topics="the Qafila business first: one order step by step, what each step records, who needs what"),
+    dict(title="Warehouse, lake, lakehouse", deck="00_story",
+         topics="why each design exists, and one order's journey through the Qafila platform"),
+]
+
 # teach: a tool walkthrough (labs/tools/<name>.ipynb) or a concept deck (slides/<name>.html);
 # opens_with: (tool, section) of another walkthrough taught first in the same session
 SESSIONS = [
@@ -93,9 +109,31 @@ def a(href: str, text: str) -> str:
     return f'<a href="{href}">{text}</a>'
 
 
+def li(name: str, topics: str, teach: str = "", lab: str = "", solution: str = "") -> str:
+    return (f'      <li><div><b>{esc(name)}</b><small>{esc(topics)}</small></div>'
+            f'<span>{teach}</span><span>{lab}</span><span>{solution}</span></li>')
+
+
+def section(label: str, title: str, colour: str, rows: list[str]) -> str:
+    return (f'  <section class="day" style="--c:var(--{colour})">\n'
+            f'    <h3><span>{label}</span>{esc(title)}</h3>\n'
+            f'    <ol>\n' + "\n".join(rows) + "\n    </ol>\n  </section>")
+
+
+def deck(name: str) -> str:
+    return f'<span title="concept deck">🖥️</span> {a("slides/" + name + ".html", "slides")}'
+
+
+def html_prep() -> str:
+    rows = [li(p["title"], p["topics"], lab=a(COLAB + p["nb"] + ".ipynb", "Notebook"),
+               solution=a(COLAB + "solutions/" + p["nb"] + ".ipynb", "Solution") if p.get("solution") else "")
+            for p in PREP]
+    return section("Before Day 1", "On your own", "navy", rows)
+
+
 def html_rows(day: int) -> str:
     title, colour = DAYS[day]
-    rows = []
+    rows = [li("Opening · " + o["title"], o["topics"], deck(o["deck"])) for o in OPENING] if day == 1 else []
     for s in [s for s in SESSIONS if s["id"].startswith(f"D{day}_")]:
         if "tool" in s:
             t = s["tool"]
@@ -105,19 +143,15 @@ def html_rows(day: int) -> str:
                 o, sec = s["opens_with"]
                 teach = teach.replace("</span> ", f'</span> {a(COLAB + "tools/" + o + ".ipynb", o)} {esc(sec)} → ', 1)
         else:
-            teach = f'<span title="concept deck">🖥️</span> {a("slides/" + s["deck"] + ".html", "slides")}'
+            teach = deck(s["deck"])
             if "demo" in s:
                 teach += f' <span class="alt">{a(COLAB + "demos/" + s["demo"] + ".ipynb", "demo")}</span>'
         lab = f'<a href="{COLAB}{s["lab"]}.ipynb" title="{s["lab"]}.ipynb">Lab</a>'
         if s.get("runs_on", "").startswith("Colab"):
             lab += ' <span class="alt">Colab</span>'
-        rows.append(
-            f'      <li><div><b>{s["id"]} · {esc(s["title"])}</b><small>{esc(s["topics"])}</small></div>'
-            f'<span>{teach}</span><span>{lab}</span>'
-            f'<span>{a(COLAB + "solutions/" + s["lab"] + ".ipynb", "Solution")}</span></li>')
-    return (f'  <section class="day" style="--c:var(--{colour})">\n'
-            f'    <h3><span>Day {day}</span>{esc(title)}</h3>\n'
-            f'    <ol>\n' + "\n".join(rows) + "\n    </ol>\n  </section>")
+        rows.append(li(f'{s["id"]} · {s["title"]}', s["topics"], teach, lab,
+                       a(COLAB + "solutions/" + s["lab"] + ".ipynb", "Solution")))
+    return section(f"Day {day}", title, colour, rows)
 
 
 def markdown_rows() -> str:
@@ -152,5 +186,5 @@ def replace_between(path: Path, begin: str, end: str, content: str) -> None:
 
 if __name__ == "__main__":
     replace_between(ROOT / "index.html", "<!-- sessions:begin -->", "<!-- sessions:end -->",
-                    "\n\n".join(html_rows(d) for d in DAYS))
+                    "\n\n".join([html_prep()] + [html_rows(d) for d in DAYS]))
     replace_between(LABS / "README.md", "<!-- notebooks:begin -->", "<!-- notebooks:end -->", markdown_rows())

@@ -32,11 +32,6 @@
   ul { padding-left: 20px; } li { margin-bottom: 6px; }
   .cols { display: grid; gap: 18px 32px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 
-  .card { display: block; text-decoration: none; color: inherit; background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 12px; padding: 18px 20px; }
-  .card:hover { border-color: var(--c); }
-  .card .n { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--c); font-weight: 700; }
-  .card p { margin: 0; color: var(--muted); font-size: 15px; }
-
   .day { background: #fff; border: 1px solid var(--line); border-left: 6px solid var(--c); border-radius: 12px; margin-bottom: 16px; }
   .day h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0; padding: 16px 20px 6px; font-size: 20px; }
   .day h3 span { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--c); }
@@ -73,21 +68,24 @@
 </header>
 
 <main class="wrap">
-  <h2>Start here</h2>
-  <div class="cols">
-    <a class="card" style="--c:var(--amber)" href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_setup_check.ipynb"><div class="n">Before Day 1</div><h3>Setup check</h3><p>Installs the packages, generates the data and tests every tool. Run it once.</p></a>
-    <a class="card" style="--c:var(--navy)" href="slides/00_intro.html"><div class="n">Day 1 · opening</div><h3>Course introduction</h3><p>The Qafila business first: one order step by step, what each step records, who needs what. Then the week and the setup.</p></a>
-    <a class="card" style="--c:var(--teal)" href="slides/00_story.html"><div class="n">Day 1 · the story</div><h3>Warehouse, lake, lakehouse</h3><p>Why each design exists, and one order's journey through the Qafila platform.</p></a>
-  </div>
-
-  <h2>Sessions</h2>
+  <h2>Schedule</h2>
   <p class="muted">The whole week follows one case: <b>Qafila</b>, a fictional grocery delivery app in Riyadh, Jeddah and Dammam, whose messy sources feed one platform that every lab extends. All data is synthetic, so the labs run offline.</p>
   <p class="muted">Each session is taught from a 📓 tool notebook (<b>read</b> shows it with outputs) or a 🖥️ slide deck, then practised in a lab. Four sessions a day, with 10′, 20′ and 10′ breaks between them. In the slides, press <code>?</code> for keys.</p>
 
   <!-- sessions:begin -->
+  <section class="day" style="--c:var(--navy)">
+    <h3><span>Before Day 1</span>On your own</h3>
+    <ol>
+      <li><div><b>Setup check</b><small>installs the packages, generates the data and tests every tool; run it once</small></div><span></span><span><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_setup_check.ipynb">Notebook</a></span><span></span></li>
+      <li><div><b>SQL window functions (if new to them)</b><small>self-paced, about 90 minutes: ranking, LAG/LEAD, frames, QUALIFY; Lab 1.4 builds on them</small></div><span></span><span><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_sql_windows.ipynb">Notebook</a></span><span><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/solutions/00_sql_windows.ipynb">Solution</a></span></li>
+    </ol>
+  </section>
+
   <section class="day" style="--c:var(--teal)">
     <h3><span>Day 1</span>Data Platforms, Storage &amp; Ingestion</h3>
     <ol>
+      <li><div><b>Opening · Course introduction</b><small>the Qafila business first: one order step by step, what each step records, who needs what</small></div><span><span title="concept deck">🖥️</span> <a href="slides/00_intro.html">slides</a></span><span></span><span></span></li>
+      <li><div><b>Opening · Warehouse, lake, lakehouse</b><small>why each design exists, and one order's journey through the Qafila platform</small></div><span><span title="concept deck">🖥️</span> <a href="slides/00_story.html">slides</a></span><span></span><span></span></li>
       <li><div><b>D1_1 · The modern data platform</b><small>OLTP vs. OLAP, an analytical database in a library, files in place, plans</small></div><span><span title="tool walkthrough, no slides">📓</span> <a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/duckdb.ipynb">duckdb</a> <span class="alt"><a href="labs/tools/html/duckdb.html">read</a></span></span><span><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_1_platform_tour.ipynb" title="D1_1_platform_tour.ipynb">Lab</a></span><span><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/solutions/D1_1_platform_tour.ipynb">Solution</a></span></li>
       <li><div><b>D1_2 · Files &amp; columnar storage</b><small>Parquet internals, statistics, partitioning, pushdown, Arrow</small></div><span><span title="concept deck">🖥️</span> <a href="slides/D1_2_files_parquet.html">slides</a></span><span><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_2_files_parquet.ipynb" title="D1_2_files_parquet.ipynb">Lab</a></span><span><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/solutions/D1_2_files_parquet.ipynb">Solution</a></span></li>
       <li><div><b>D1_3 · Batch ingestion</b><small>full vs. incremental, cursors, pagination, retries, schema evolution</small></div><span><span title="tool walkthrough, no slides">📓</span> <a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/tools/dlt.ipynb">dlt</a> <span class="alt"><a href="labs/tools/html/dlt.html">read</a></span></span><span><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/D1_3_ingestion_dlt.ipynb" title="D1_3_ingestion_dlt.ipynb">Lab</a></span><span><a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/solutions/D1_3_ingestion_dlt.ipynb">Solution</a></span></li>
@@ -171,8 +169,8 @@
         <dd>Developers, analysts and data scientists who know Python and SQL. No Spark, dbt, orchestration or streaming experience needed.</dd>
         <dt>Environment</dt>
         <dd>Google Colab, or any laptop with <code>uv</code>. No Docker or cloud account; Spark needs Java 17+. See <a href="https://github.com/SDAIAAcademy/data-engineering/tree/main/labs#readme">labs/README.md</a>.</dd>
-        <dt>On your own</dt>
-        <dd>New to SQL window functions? Do <a href="https://colab.research.google.com/github/SDAIAAcademy/data-engineering/blob/main/labs/00_sql_windows.ipynb">00_sql_windows</a> (~90 min) before Lab 1.4. In the tool notebooks, 🎯 sections are taught in class and ➕ sections are for later; answers are in <code>labs/solutions/tools/</code>.</dd>
+        <dt>Tool notebooks</dt>
+        <dd>🎯 sections are taught in class and ➕ sections are for later; answers are in <code>labs/solutions/tools/</code>.</dd>
         <dt>Stack</dt>
         <dd>DuckDB · Polars · Parquet/Arrow · dlt · dbt · Iceberg · PySpark 4 · Pandera · Dagster · ODCS · model2vec</dd>
       </dl>
