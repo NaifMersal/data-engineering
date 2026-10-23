@@ -9,8 +9,8 @@
 # The inputs: a snapshot of `customers` taken on **1 September 2026**, and every change made during September
 # (`data/raw/cdc/customers_changes.jsonl`), in the order the connector delivered them.
 #
-# This lab leans on window functions (`row_number`, `lead`, frames, `QUALIFY`). If they're new to you, do Lab 0
-# (`00_sql_windows.ipynb`) first.
+# This lab leans on window functions (`row_number`, `lead`, frames, `QUALIFY`). If they're new to you, walk through
+# `00_sql_windows.ipynb` first.
 #
 # **Tasks**
 # - [ ] 1 · Read the feed; find duplicates and out-of-order events (4')
@@ -274,9 +274,10 @@ by_city
 U.check(by_city.difference.abs().sum() > 0, "moving customers shift revenue between cities")
 
 # %% [markdown]
-# 🔍 The totals differ by a few percent at most, but for a city manager whose bonus depends on it, "a few percent" is the
-# whole conversation. Which one is right depends on the question: **as-of** for "where did we sell", **current** for
-# "where are our customers now". Also note: orders of erased customers fall out of both joins. Day 2's star schema keeps
+# 🔍 The city totals differ by a few percent at most, but if marketing splits its campaign budget by customer city, "a few
+# percent" is real money. Which one is right depends on the question: **as-of** for "how much did customers spend while
+# they lived in each city", **current** for "where do our customers live now". Where we *sold* is a third question, and
+# the store answers it. Also note: orders of erased customers fall out of both joins. Day 2's star schema keeps
 # them with an "unknown customer" row.
 #
 # ## ✱ Stretch · Make the MERGE incremental: process the feed in 4 batches
