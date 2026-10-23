@@ -1,8 +1,8 @@
 # %% [markdown]
 # # DuckDB, an analytical database in a library
 #
-# Day 1, before Lab 1.1 · CPU only. Finance asks for revenue per store per day. You ask the app database and pandas,
-# watch both struggle, then learn the engine every lab of this course runs on.
+# Day 1 · Session 1, after the first part of the slides · CPU only. The slides showed why analytics stores data by
+# column. Here you ask Finance's question of the app database and of DuckDB, then learn the engine every lab runs on.
 #
 # **The data:** a large copy of Qafila's orders table, built by the setup cell, and a few daily files small enough to
 # check by eye. Lab 1.1 points the same tools at the real sources.
@@ -10,24 +10,23 @@
 # 🤔 asks you to predict before you run a cell · 🔍 says what the output means · ➕ sections are for your own pace.
 #
 # **Contents**
-# - [ ] 1 · The problem: analytics on the app database
-# - [ ] 2 · The mental model: in-process, columnar, vectorized
-# - [ ] 3 · A query, a connection, a database file
-# - [ ] 4 · Files where they are: CSV, globs, JSON, Parquet
-# - [ ] 5 · Tables, views, other databases, and one writer at a time
-# - [ ] 6 · Python in and out: DataFrames, relations, parameters
-# - [ ] 7 · Friendly SQL ➕
-# - [ ] 8 · Read the plan: EXPLAIN and EXPLAIN ANALYZE ➕
-# - [ ] 9 · Summary
+# - [ ] 1 · Finance's question, two databases
+# - [ ] 2 · A connection and a database file
+# - [ ] 3 · Files where they are: CSV, globs, JSON, Parquet
+# - [ ] 4 · Tables, views, other databases, and one writer at a time
+# - [ ] 5 · Results into Python
+# - [ ] 6 · Friendly SQL ➕
+# - [ ] 7 · Summary
 
 # %% [markdown] 🎓
 # 🎓 **Instructor notes** (instructor copy only)
 #
 # - Run the setup cell before class: it builds a 1M-row app database (a few seconds, longer on Colab). §1 then
-#   takes about half a minute, most of it waiting for SQLite and pandas: that wait is the point.
-# - Core ≈ 24': §1 4' · §2 2' · §3 3' · §4 6' (CSV sniffing, the glob trap; JSON and Parquet ➕) · §5 4' (one
-#   writer; views and `ATTACH` ➕) · §6 3' (parameters ➕) · §9 2'. §7 and §8 are ➕; Lab 1.2 goes deeper into plans
-#   and Parquet.
+#   takes a few seconds, most of it waiting for SQLite: that wait is the point.
+# - Core ≈ 15': §1 4' · §2 2' · §3 4' (CSV sniffing, the glob trap; JSON and Parquet ➕) · §4 3' (one writer; views
+#   and `ATTACH` ➕) · §5 1' · §7 1'. §6 is ➕.
+# - The slides (`slides/D1_1_storage.html`, part 1) already explained OLTP vs. OLAP and row vs. column storage. §1 is
+#   the proof on a laptop; don't explain the layout again, point back at the boards.
 # - In class, run the cells of a ➕ part without stopping on them: later cells may use what they build.
 # - Lab 1.1 reads the real sources (CSV, JSON lines, SQLite) and profiles them; don't solve its exercises here.
 # - Timings differ per machine and on Colab. The ratio is the point, not the numbers.
@@ -52,12 +51,9 @@ import re
 import sqlite3
 
 import duckdb
-import pandas as pd
 from IPython.display import display
 import de_utils as U
 import de_viz as V
-
-pd.set_option("display.width", 160)
 
 
 def first_error(stderr):
@@ -72,7 +68,7 @@ F = OUT.as_posix()                     # DuckDB likes forward slashes, also on W
 APP = OUT / "app.sqlite"               # a stand-in for the app's database
 N = U.pick(1_000_000, 200_000)         # orders in it (fewer in quick mode)
 
-# The app database: one big orders table, as the app stores it (timestamps as text). How this cell works is §5.
+# The app database: one big orders table, as the app stores it (timestamps as text). How this cell works is §4.
 with duckdb.connect() as build:
     build.sql(f"ATTACH '{APP.as_posix()}' AS app (TYPE sqlite)")
     build.sql(f"""
@@ -95,10 +91,10 @@ print(f"Output folder: {OUT}\napp database: {N:,} orders, {U.size_mb(APP):.0f} M
 V.platform_map(tool="duckdb")
 
 # %% [markdown]
-# ## 1 · The problem: analytics on the app database
+# ## 1 · Finance's question, two databases
 #
-# Finance's question: **revenue per store per day**. The orders live in the app's database, a row store built to
-# save one order and fetch one customer quickly. The first try is to ask it directly.
+# Finance's question: **revenue per store per day**. The orders live in the app's database, SQLite, a row store built
+# to save one order quickly (OLTP, in the slides). The first try is to ask it directly.
 
 # %%
 QUESTION = """
@@ -112,28 +108,16 @@ times = {}
 app = sqlite3.connect(APP)
 with U.timer("the app database (SQLite)", times):
     answer = app.execute(QUESTION).fetchall()
+app.close()
 print(len(answer), "rows, first:", answer[0])
 
 # %% [markdown]
-# 🔍 Seconds for one small chart, while customers place orders on the same database.
+# 🔍 About a second for one small chart, on a laptop with nobody else using it. In production the same read
+# competes with customers placing orders, on a table that grows every day.
 #
-# 🤔 **Predict** · Second try: pull the table into pandas and sum there. Faster or slower? How much memory?
-
-# %%
-with U.timer("pull into pandas", times):
-    orders_df = pd.read_sql("SELECT * FROM orders", app)
-with U.timer("compute in pandas", times):
-    delivered = orders_df[orders_df.status == "delivered"]
-    by_pandas = delivered.groupby([delivered.created_at.str[:10], "store_id"]).amount.sum()
-print(f"pandas holds {orders_df.memory_usage(deep=True).sum() / 1e6:.0f} MB: every row and every column, "
-      "including the notes we never use")
-app.close()
-
-# %% [markdown]
-# 🔍 The computing was quick; **moving** the data was slow. Every value left SQLite as a Python object, just to sum
-# one column.
+# Second try: copy the table once into a DuckDB file, a column store, then ask the same SQL there.
 #
-# Third try: copy the table once into a DuckDB file, then ask there.
+# 🤔 **Predict** · How much faster? And will the DuckDB file be bigger or smaller than SQLite's?
 
 # %%
 with duckdb.connect(f"{F}/analytics.duckdb") as con:
@@ -148,44 +132,24 @@ U.check(by_duckdb == answer, "the same answer as SQLite")
 print(f"\nfile sizes: SQLite {U.size_mb(APP):.0f} MB · DuckDB {U.size_mb(OUT / 'analytics.duckdb'):.0f} MB")
 
 # %%
-V.bars(pd.DataFrame({"way": list(times), "seconds": list(times.values())}), "way", ["seconds"],
+V.bars({"way": list(times), "seconds": list(times.values())}, "way", ["seconds"],
        suptitle="Revenue per store per day: where the time goes", fmt="{:.2f}")
 
 # %% [markdown]
-# 🔍 The same answer in a fraction of the time, from a file several times smaller. The data didn't change; only how
-# it is stored and processed did.
+# 🔍 The same answer in a fraction of the time, from a file several times smaller. The rows didn't change, only how
+# they are stored: DuckDB read the four columns the question names and skipped `order_id` and the notes, and
+# similar values side by side compressed well (the slides' column board).
+#
+# Two more things make it fast. It runs **in your Python process**, like SQLite: no server, nothing to install but the
+# package. And it works on batches of about 2,048 values at a time, on every CPU core.
 
 # %% [markdown] 🎓
-# 🎓 Ask before §2: "why is DuckDB's file smaller than SQLite's, with the same rows?" Most rooms get to "columns
-# compress better" quickly. Keep the OLTP/OLAP point: the app database is right for the app, wrong for this question.
+# 🎓 Ask before the DuckDB cell: "bigger or smaller file?" Most rooms say bigger ("an analytics engine must add
+# indexes"). The smaller file is the column store's compression, from the slides. Keep the OLTP/OLAP point: the app
+# database is right for the app, wrong for this question.
 
 # %% [markdown]
-# ## 2 · The mental model: in-process, columnar, vectorized
-#
-# ```
-#  ROW STORE (SQLite, PostgreSQL)              COLUMN STORE (DuckDB, Parquet, Snowflake)
-#  page 1: [1, RUH-04, 08-01, 275.86, …, note] order_id: [1, 2, 3, 4, …]        ← skipped
-#  page 2: [2, JED-03, 08-01,  33.65, …, note] store_id: [RUH-04, JED-03, …]    ← read
-#  page 3: [3, RUH-04, 08-01,  12.00, …, note] amount:   [275.86, 33.65, …]     ← read
-#          sum(amount) reads every page        note:     [...]                  ← skipped
-#                                              similar values side by side compress well
-# ```
-#
-# | Idea | What it means | You saw it in §1 |
-# |---|---|---|
-# | **In-process** | a library inside your Python process, like SQLite; no server, no network | `duckdb.connect()`, nothing to install but the package |
-# | **Columnar** | each column stored apart, compressed | reads 3 of 6 columns; a smaller file |
-# | **Vectorized** | each operator works on batches of ~2,048 values, on all CPU cores | a GROUP BY over 1M rows in a blink |
-#
-# | | Runs | Stores rows as | Built for |
-# |---|---|---|---|
-# | SQLite | in your process | rows | an app's own data: many small reads and writes |
-# | PostgreSQL, MySQL | a server | rows | many users writing small transactions |
-# | **DuckDB** | **in your process** | **columns** | **analytics on one machine** |
-# | Snowflake, BigQuery, Redshift | a managed service | columns | analytics on a cluster, shared by a company |
-
-# %% [markdown]
-# ## 3 · A query, a connection, a database file
+# ## 2 · A connection and a database file
 
 # %%
 duckdb.sql("SELECT 42 AS answer, 'مرحبا' AS greeting")
@@ -255,11 +219,11 @@ with duckdb.connect(str(DB)) as con:
 # | `duckdb.sql(...)` | the default in-memory connection: quick looks |
 # | `duckdb.connect()` | a new in-memory database |
 # | `duckdb.connect("x.duckdb")` | a database file, created if missing |
-# | `duckdb.connect("x.duckdb", read_only=True)` | the same file, without the right to change it (§5) |
+# | `duckdb.connect("x.duckdb", read_only=True)` | the same file, without the right to change it (§4) |
 # | `with duckdb.connect(...) as con:` | closes the connection at the end of the block |
 
 # %% [markdown]
-# ## 4 · Files where they are: CSV, globs, JSON, Parquet
+# ## 3 · Files where they are: CSV, globs, JSON, Parquet
 #
 # A CSV has no types, so DuckDB **sniffs** them from a sample of rows. `DESCRIBE` shows what it decided.
 #
@@ -268,8 +232,8 @@ with duckdb.connect(str(DB)) as con:
 # %%
 con = duckdb.connect()                 # in memory, for the rest of the notebook
 for day in ["2026-09-14", "2026-09-15"]:
-    types = con.sql(f"DESCRIBE FROM '{F}/orders_{day}.csv'").df()
-    print(day, dict(zip(types.column_name, types.column_type)))
+    types = con.sql(f"SELECT column_name, column_type FROM (DESCRIBE FROM '{F}/orders_{day}.csv')").fetchall()
+    print(day, dict(types))
 
 # %% [markdown]
 # 🔍 One value that isn't a number turns the whole column into `VARCHAR`, without an error. **Always check the types**
@@ -315,19 +279,19 @@ con.sql(f"""
     '"items": [{"sku": "TEA-01", "qty": 2}, {"sku": "DATES-1KG", "qty": 1}]}\n'
     '{"order_id": 105, "courier": {"id": "C-22", "vehicle": "car"}, "items": [{"sku": "MILK-2L", "qty": 3}]}\n',
     encoding="utf-8")
-display(con.sql(f"DESCRIBE FROM '{F}/order_details.jsonl'").df()[["column_name", "column_type"]])
+display(con.sql(f"SELECT column_name, column_type FROM (DESCRIBE FROM '{F}/order_details.jsonl')"))
 con.sql(f"""
     SELECT order_id, courier.vehicle, unnest(items, recursive := true)
     FROM '{F}/order_details.jsonl'""")
 
 # %% [markdown]
-# ➕ **Parquet** is the course's columnar file format (Lab 1.2). `COPY ... TO` writes any query to a file. Reading it
-# back needs no options, because the types are stored in the file.
+# ➕ **Parquet** is a column store in a file, the format of the slides' second part and Lab 1.2. `COPY ... TO` writes
+# any query to a file. Reading it back needs no options, because the types are stored in the file.
 
 # %%
 con.sql(f"""COPY (SELECT * FROM read_csv('{F}/orders_*.csv', union_by_name = true))
             TO '{F}/orders.parquet' (FORMAT parquet)""")
-con.sql(f"DESCRIBE FROM '{F}/orders.parquet'").df()[["column_name", "column_type"]]
+con.sql(f"SELECT column_name, column_type FROM (DESCRIBE FROM '{F}/orders.parquet')")
 
 # %% [markdown]
 # | Source | Read with | Notes |
@@ -344,7 +308,7 @@ con.sql(f"DESCRIBE FROM '{F}/orders.parquet'").df()[["column_name", "column_type
 # make the link themselves: "where have we seen a number column become text?"
 
 # %% [markdown]
-# ## 5 · Tables, views, other databases, and one writer at a time
+# ## 4 · Tables, views, other databases, and one writer at a time
 #
 # A **table** is a copy, taken once. A **view** is a saved query, run again each time it is used.
 
@@ -371,7 +335,7 @@ wh.sql("SELECT (SELECT count(*) FROM orders) AS in_table, (SELECT count(*) FROM 
 
 # %%
 wh.sql(f"ATTACH '{APP.as_posix()}' AS app (TYPE sqlite, READ_ONLY)")
-display(wh.sql("SELECT database_name, schema_name, table_name FROM duckdb_tables() ORDER BY ALL").df())
+display(wh.sql("SELECT database_name, schema_name, table_name FROM duckdb_tables() ORDER BY ALL"))
 wh.sql("""
     SELECT o.store_id, count(*) AS toy_orders, any_value(a.n) AS orders_in_app
     FROM orders o
@@ -408,65 +372,37 @@ print("❌" if other.returncode else "✅", other.stdout.strip() or first_error(
 #   like Iceberg (Day 3).
 
 # %% [markdown]
-# ## 6 · Python in and out: DataFrames, relations, parameters
+# ## 5 · Results into Python
 #
-# **In:** a pandas (or Polars, or Arrow) DataFrame in a Python variable can be queried by its **name**.
+# A query shows as a table in the notebook. When the next step is Python code, take the rows out:
 
 # %%
-targets = pd.DataFrame({"store_id": ["RUH-04", "JED-03", "DMM-01"], "daily_target": [150.0, 50.0, 35.0]})
-con.sql("SELECT * FROM targets WHERE daily_target > 40")
-
-# %% [markdown]
-# **Out:** a result converts to whatever the next step needs.
-
-# %%
-result = con.sql("SELECT store_id, daily_target FROM targets ORDER BY store_id")
-print(type(result.df()).__module__, type(result.pl()).__module__, type(result.to_arrow_table()).__module__)
-result.fetchall()
+revenue = con.sql(f"""
+    SELECT store_id, round(sum(amount), 2) AS revenue
+    FROM read_csv('{F}/orders_*.csv', union_by_name = true)
+    WHERE status = 'delivered'
+    GROUP BY ALL ORDER BY revenue DESC""")
+print(revenue.fetchall())
+print("top store:", revenue.fetchall()[0][0])
 
 # %% [markdown]
 # | Call | Gives |
 # |---|---|
-# | `.df()` | a pandas DataFrame |
+# | `.fetchall()` | a list of rows, each a tuple: `[0][0]` is the first value of the first row |
+# | `.df()` | a table Python can chart or save (a pandas DataFrame; the labs only display it) |
 # | `.pl()` | a Polars DataFrame (Day 2) |
-# | `.to_arrow_table()` | an Arrow table (PyIceberg, Day 3) |
-# | `.fetchall()` | a list of Python tuples |
-# | `.show()` | prints a preview |
+# | `.columns` | the column names |
 #
-# Older tutorials use `.fetchone()`, which relations lost in DuckDB 2.0: take `.fetchall()[0]` instead.
-#
-# What `con.sql(...)` returns is a **relation**: a query that runs when you ask for rows, and again **every time**
-# you ask.
-#
-# 🤔 **Predict** · We keep a relation that counts the orders in the files, then Friday's file arrives. What does the
-# same relation say?
-
-# %%
-order_count = con.sql(f"SELECT count(*) AS orders FROM read_csv('{F}/orders_*.csv', union_by_name = true)")
-print("before:", order_count.fetchall())
-(OUT / "orders_2026-09-18.csv").write_text(
-    "order_id,store_id,status,amount,delivery_fee,promo_code\n112,DMM-01,delivered,33.00,9.00,\n", encoding="utf-8")
-print("after: ", order_count.fetchall())
-
-# %% [markdown]
-# 🔍 A relation behaves like a view: cheap to keep, re-run (glob included) when used. Call `.df()` once for a fixed
-# result. Relations also chain, the style Polars uses (Day 2):
-
-# %%
-files = con.read_csv(f"{F}/orders_*.csv", union_by_name=True)
-files.filter("status = 'delivered'").aggregate("store_id, round(sum(amount), 2) AS revenue").order("revenue DESC")
-
-# %% [markdown]
-# ➕ **Parameters.** A value from Python (a date, a store picked in a dashboard) goes in as a parameter, not pasted into
-# the SQL string: no quoting bugs and no SQL injection.
+# ➕ **Parameters.** A value from Python (a date, a store picked in a dashboard) goes in as a `?`, not pasted into the
+# SQL string: no quoting bugs and no SQL injection.
 
 # %%
 store = "JED-03"
 con.execute(f"SELECT order_id, amount FROM read_csv('{F}/orders_*.csv', union_by_name = true) WHERE store_id = ?",
-            [store]).df()
+            [store]).fetchall()
 
 # %% [markdown]
-# ## 7 · Friendly SQL ➕
+# ## 6 · Friendly SQL ➕
 #
 # DuckDB's SQL is PostgreSQL-like, plus shortcuts the labs use.
 
@@ -475,92 +411,34 @@ con.sql(f"CREATE OR REPLACE TABLE o AS FROM read_csv('{F}/orders_*.csv', union_b
 con.sql("""
     FROM o                                         -- FROM first; SELECT * is implied
     SELECT * EXCLUDE (delivery_fee, promo_code)    -- every column but these
-             REPLACE (round(amount) AS amount)     -- ...with this one changed
     WHERE status = 'delivered'
     LIMIT 3""")
 
 # %%
 con.sql("""
-    SELECT store_id, status, count(*) AS orders, max_by(order_id, amount) AS biggest_order
+    SELECT store_id, status, count(*) AS orders
     FROM o
     GROUP BY ALL                                   -- group by every column that isn't aggregated
     ORDER BY ALL                                   -- order by every column, left to right""")
 
 # %%
-con.sql("PIVOT o ON status USING round(sum(amount), 2) GROUP BY store_id ORDER BY store_id")
-
-# %%
-con.sql("SUMMARIZE o").df()[["column_name", "column_type", "min", "max", "approx_unique", "null_percentage"]]
+con.sql("SELECT column_name, column_type, min, max, approx_unique, null_percentage FROM (SUMMARIZE o)")
 
 # %% [markdown]
 # | Shortcut | Does |
 # |---|---|
 # | `FROM t` / `FROM t SELECT ...` | `SELECT * FROM t` / FROM written first |
-# | `SELECT * EXCLUDE (a)`, `* REPLACE (expr AS a)` | all columns but some / with some changed |
+# | `SELECT * EXCLUDE (a)` | all columns but some |
 # | `GROUP BY ALL`, `ORDER BY ALL` | no need to repeat the columns |
-# | `COLUMNS('regex')` | the same expression on every matching column: `SELECT max(COLUMNS('amount|fee'))` |
-# | `max_by(x, y)`, `arg_min`, `FILTER (WHERE ...)` | the `x` of the largest `y`; conditional aggregates |
-# | `PIVOT`, `UNPIVOT` | rows ↔ columns |
 # | `DESCRIBE`, `SUMMARIZE` | the types / a profile of every column (Lab 1.1) |
 # | `QUALIFY` | filter on a window function (`00_sql_windows`, Lab 1.4) |
 
 # %% [markdown]
-# ## 8 · Read the plan: EXPLAIN and EXPLAIN ANALYZE ➕
-#
-# DuckDB turns your SQL into a **plan**, a tree of operators read **from the bottom up**. `EXPLAIN` shows it without
-# running the query. Here is §1's question, asked of a Parquet copy of the big table.
-
-# %%
-with duckdb.connect(f"{F}/analytics.duckdb", read_only=True) as src:
-    src.sql(f"COPY orders TO '{F}/big_orders.parquet' (FORMAT parquet)")
-BIG = f"'{Path(os.path.relpath(OUT / 'big_orders.parquet')).as_posix()}'"   # relative: a shorter plan
-print(con.sql(f"""EXPLAIN SELECT store_id, sum(amount) FROM {BIG}
-                  WHERE status = 'delivered' GROUP BY ALL""").fetchall()[0][1])
-
-# %% [markdown]
-# 🔍 The bottom box, the scan of the Parquet file, already knows two things from the query:
-# - **Projections**: only `store_id` and `amount` are read; the other columns are never touched.
-# - **Filters**: `status='delivered'` is applied while reading (a **pushed-down** filter).
-#
-# Above it, a **Hash Group By** sums per store. Rows marked `~` are estimates, made before anything is read.
-#
-# `EXPLAIN ANALYZE` **runs** the query and shows each operator's real rows and time.
-
-# %%
-profile = con.sql(f"""EXPLAIN ANALYZE SELECT store_id, sum(amount) FROM {BIG}
-                      WHERE status = 'delivered' GROUP BY ALL""").fetchall()[0][1]
-print(re.search(r"Total Time: \S+", profile).group())
-print(profile[profile.rindex("╭─"):])                     # the last box: the scan
-
-# %% [markdown]
-# 🔍 The scan produced only the delivered orders: the cancelled ones never left it. When a query is slow, this shows
-# **where**: a scan reading too much (Lab 1.2), a join exploding, a sort spilling to disk.
-#
-# 🤔 **Predict** · DuckDB uses all CPU cores by default. How much slower is the same question on **one** thread?
-
-# %%
-question = f"SELECT store_id, sum(amount) FROM {BIG} WHERE status = 'delivered' GROUP BY ALL"
-cores = con.sql("SELECT current_setting('threads')").fetchall()[0][0]
-all_cores = U.best_of(lambda: con.sql(question).fetchall())
-con.sql("SET threads = 1")
-one_core = U.best_of(lambda: con.sql(question).fetchall())
-con.sql(f"SET threads = {cores}")
-print(f"{cores} threads: {all_cores * 1000:.0f} ms | 1 thread: {one_core * 1000:.0f} ms | {one_core / all_cores:.1f}x")
-
-# %% [markdown]
-# 🔍 Vectorized batches spread over every core: the parallelism a laptop gives for free. Beyond one machine you need
-# a cluster (Spark, Day 3).
-
-# %% [markdown] 🎓
-# 🎓 On Colab's 2 cores the speed-up is small; say so before running it. Don't go deeper into plans here: Lab 1.2
-# counts the row groups the scan skips, and Lab 2.1 compares DuckDB's plan with Polars'.
-
-# %% [markdown]
-# ## 9 · Summary
+# ## 7 · Summary
 #
 # | | |
 # |---|---|
-# | **It does** | SQL analytics on one machine, fast · files in place (CSV, JSON, Parquet, Iceberg) · attach SQLite / PostgreSQL · DataFrames in and out · data larger than memory, by spilling to disk |
+# | **It does** | SQL analytics on one machine, fast · files in place (CSV, JSON, Parquet, Iceberg) · attach SQLite / PostgreSQL · results into Python · data larger than memory, by spilling to disk |
 # | **It doesn't** | serve an app (many small writes from many users: that's PostgreSQL) · let several processes write one file · scale past one machine (Spark, Day 3) · ingest, schedule or test by itself (dlt, Dagster, dbt) |
 # | **In this course** | the dlt destination (Lab 1.3) · the engine under dbt (Lab 2.3) · the warehouse `warehouse/qafila.duckdb` · a reader of Iceberg tables (Lab 3.1) |
 # | **As a service** | MotherDuck; Snowflake, BigQuery, Redshift and Databricks SQL offer the same columnar SQL at company scale |
@@ -570,19 +448,18 @@ print(f"{cores} threads: {all_cores * 1000:.0f} ms | 1 thread: {one_core * 1000:
 # | Code | Does |
 # |---|---|
 # | `duckdb.connect()` / `duckdb.connect("x.duckdb", read_only=True)` | in memory / a database file |
-# | `con.sql("...")` | a relation: runs when you ask for rows |
-# | `.df()`, `.pl()`, `.fetchall()` | results as pandas, Polars, tuples |
 # | `FROM 'x.csv'`, `read_csv(..., types = {...})` | a file as a table; take the types into your own hands |
 # | `read_csv('*.csv', union_by_name = true, filename = true)` | many files, matched by column name, traced to their file |
 # | `CREATE TABLE t AS ...`, `CREATE VIEW v AS ...` | a copy / a saved query |
 # | `ATTACH 'app.sqlite' AS app (TYPE sqlite, READ_ONLY)` | another database, joinable |
 # | `COPY (query) TO 'x.parquet' (FORMAT parquet)` | write a file |
+# | `.fetchall()`, `.df()` | rows as tuples / a table to chart or save |
 # | `con.execute("... WHERE id = ?", [value])` | a parameter from Python |
-# | `DESCRIBE`, `SUMMARIZE`, `EXPLAIN`, `EXPLAIN ANALYZE` | types, profile, plan, plan with timings |
+# | `DESCRIBE`, `SUMMARIZE` | the types / a profile of every column |
 #
 # ## Checkpoint
 #
-# 1. DuckDB answered faster than both SQLite and pandas, from a smaller file. Why?
+# 1. DuckDB answered faster than SQLite, from a smaller file. Why?
 # 2. A column you expect to be numeric comes out as `VARCHAR`. What do you do, and what do you not do?
 # 3. Daily files keep arriving: when is a table right, and when a view?
 # 4. `dbt run` fails with "could not set lock on file". What is holding it, and what are two ways to avoid it?
@@ -591,8 +468,7 @@ print(f"{cores} threads: {all_cores * 1000:.0f} ms | 1 thread: {one_core * 1000:
 # [Python API](https://duckdb.org/docs/stable/clients/python/overview) ·
 # [CSV import](https://duckdb.org/docs/stable/data/csv/overview) ·
 # [friendly SQL](https://duckdb.org/docs/stable/sql/dialect/friendly_sql) ·
-# [concurrency](https://duckdb.org/docs/stable/connect/concurrency) ·
-# [EXPLAIN](https://duckdb.org/docs/stable/guides/meta/explain).
+# [concurrency](https://duckdb.org/docs/stable/connect/concurrency).
 #
 # **What you built:** the tables and the view in `qafila_toy.duckdb`.
 

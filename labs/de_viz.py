@@ -685,7 +685,9 @@ def bars(df, label, values, titles=None, suptitle=None, fmt=None, ylabel=None):
     """Horizontal bars, one small panel per measure (never two scales on one axis).
 
     Values are labelled at the bar tips with `fmt`; by default whole numbers get no decimals, others one.
+    `df` may also be a DuckDB result, a dict of lists or a list of dicts, so notebooks need no pandas.
     """
+    df = df.df() if hasattr(df, "df") else pd.DataFrame(df)
     titles = titles or values
     n = len(df)
     fig, axes = plt.subplots(1, len(values), figsize=(4.6 * len(values) + 0.6, 0.38 * n + 1.3), squeeze=False)

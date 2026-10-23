@@ -7802,22 +7802,20 @@ a.anchor-link {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="DuckDB,-an-analytical-database-in-a-library">DuckDB, an analytical database in a library<a class="anchor-link" href="#DuckDB,-an-analytical-database-in-a-library">¶</a></h1><p>Day 1, before Lab 1.1 · CPU only. Finance asks for revenue per store per day. You ask the app database and pandas,
-watch both struggle, then learn the engine every lab of this course runs on.</p>
+<h1 id="DuckDB,-an-analytical-database-in-a-library">DuckDB, an analytical database in a library<a class="anchor-link" href="#DuckDB,-an-analytical-database-in-a-library">¶</a></h1><p>Day 1 · Session 1, after the first part of the slides · CPU only. The slides showed why analytics stores data by
+column. Here you ask Finance's question of the app database and of DuckDB, then learn the engine every lab runs on.</p>
 <p><strong>The data:</strong> a large copy of Qafila's orders table, built by the setup cell, and a few daily files small enough to
 check by eye. Lab 1.1 points the same tools at the real sources.</p>
 <p>🤔 asks you to predict before you run a cell · 🔍 says what the output means · ➕ sections are for your own pace.</p>
 <p><strong>Contents</strong></p>
 <ul>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · The problem: analytics on the app database</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · The mental model: in-process, columnar, vectorized</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · A query, a connection, a database file</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · Files where they are: CSV, globs, JSON, Parquet</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Tables, views, other databases, and one writer at a time</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · Python in and out: DataFrames, relations, parameters</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Friendly SQL ➕</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>8 · Read the plan: EXPLAIN and EXPLAIN ANALYZE ➕</li>
-<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>9 · Summary</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>1 · Finance's question, two databases</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>2 · A connection and a database file</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>3 · Files where they are: CSV, globs, JSON, Parquet</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>4 · Tables, views, other databases, and one writer at a time</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>5 · Results into Python</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>6 · Friendly SQL ➕</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" disabled="" type="checkbox"/>7 · Summary</li>
 </ul>
 </div>
 </div>
@@ -7849,12 +7847,9 @@ check by eye. Lab 1.1 points the same tools at the real sources.</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">sqlite3</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">duckdb</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">display</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">de_utils</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">U</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">de_viz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">V</span>
-
-<span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"display.width"</span><span class="p">,</span> <span class="mi">160</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">first_error</span><span class="p">(</span><span class="n">stderr</span><span class="p">):</span>
@@ -7869,7 +7864,7 @@ check by eye. Lab 1.1 points the same tools at the real sources.</p>
 <span class="n">APP</span> <span class="o">=</span> <span class="n">OUT</span> <span class="o">/</span> <span class="s2">"app.sqlite"</span>               <span class="c1"># a stand-in for the app's database</span>
 <span class="n">N</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">pick</span><span class="p">(</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="mi">200_000</span><span class="p">)</span>         <span class="c1"># orders in it (fewer in quick mode)</span>
 
-<span class="c1"># The app database: one big orders table, as the app stores it (timestamps as text). How this cell works is §5.</span>
+<span class="c1"># The app database: one big orders table, as the app stores it (timestamps as text). How this cell works is §4.</span>
 <span class="k">with</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span> <span class="k">as</span> <span class="n">build</span><span class="p">:</span>
     <span class="n">build</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ATTACH '</span><span class="si">{</span><span class="n">APP</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span><span class="si">}</span><span class="s2">' AS app (TYPE sqlite)"</span><span class="p">)</span>
     <span class="n">build</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"""</span>
@@ -7935,32 +7930,32 @@ tool on the map reads from it or writes to it.</p>
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
 <div class="jp-OutputPrompt jp-OutputArea-prompt">Out[2]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<div id="pm-42ceed8782"><style>
-#pm-42ceed8782 {font-family: system-ui, sans-serif; color: #101820; background: #fff; border: 1px solid #e4e1d8;
+<div id="pm-ab1b6e8277"><style>
+#pm-ab1b6e8277 {font-family: system-ui, sans-serif; color: #101820; background: #fff; border: 1px solid #e4e1d8;
      border-radius: 8px; padding: 12px 14px; max-width: 100%; overflow-x: auto; color-scheme: light}
-#pm-42ceed8782 .pm-here {font-size: 13.5px; margin: 0 0 10px}
-#pm-42ceed8782 .pm-g {display: grid; grid-template-columns: repeat(6, minmax(118px, 1fr)); gap: 5px; min-width: 760px;
+#pm-ab1b6e8277 .pm-here {font-size: 13.5px; margin: 0 0 10px}
+#pm-ab1b6e8277 .pm-g {display: grid; grid-template-columns: repeat(6, minmax(118px, 1fr)); gap: 5px; min-width: 760px;
            position: relative}
-#pm-42ceed8782 .pm-col {border-radius: 6px; background: rgba(28,53,94,0.07); z-index: 0}
-#pm-42ceed8782 .pm-h {z-index: 1; font-weight: bold; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em;
+#pm-ab1b6e8277 .pm-col {border-radius: 6px; background: rgba(28,53,94,0.07); z-index: 0}
+#pm-ab1b6e8277 .pm-h {z-index: 1; font-weight: bold; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em;
            color: #5b6472; padding: 6px 18px 6px 10px; background: #f4f2ec;
            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%)}
-#pm-42ceed8782 .pm-h:first-child {clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%)}
-#pm-42ceed8782 .pm-h.on {background: #1c355e; color: #fff}
-#pm-42ceed8782 .pm-t, #pm-42ceed8782 .pm-s, #pm-42ceed8782 .pm-b {z-index: 1; border: 1px solid #b9b5aa; border-radius: 6px;
+#pm-ab1b6e8277 .pm-h:first-child {clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%)}
+#pm-ab1b6e8277 .pm-h.on {background: #1c355e; color: #fff}
+#pm-ab1b6e8277 .pm-t, #pm-ab1b6e8277 .pm-s, #pm-ab1b6e8277 .pm-b {z-index: 1; border: 1px solid #b9b5aa; border-radius: 6px;
            background: #fff; padding: 4px 8px; font-size: 12px; line-height: 1.3}
-#pm-42ceed8782 .pm-t b, #pm-42ceed8782 .pm-b b {font-size: 12.5px}
-#pm-42ceed8782 .pm-t small, #pm-42ceed8782 .pm-s small, #pm-42ceed8782 .pm-b small {display: block; color: #5b6472; font-size: 11px}
-#pm-42ceed8782 .pm-t i, #pm-42ceed8782 .pm-b i {float: right; font-style: normal; font-size: 10.5px; color: #5b6472;
+#pm-ab1b6e8277 .pm-t b, #pm-ab1b6e8277 .pm-b b {font-size: 12.5px}
+#pm-ab1b6e8277 .pm-t small, #pm-ab1b6e8277 .pm-s small, #pm-ab1b6e8277 .pm-b small {display: block; color: #5b6472; font-size: 11px}
+#pm-ab1b6e8277 .pm-t i, #pm-ab1b6e8277 .pm-b i {float: right; font-style: normal; font-size: 10.5px; color: #5b6472;
            font-variant-numeric: tabular-nums; margin-left: 6px}
-#pm-42ceed8782 .pm-s {border-style: dashed}
-#pm-42ceed8782 .pm-b {background: #f9f8f4}
-#pm-42ceed8782 .pm-b b {display: inline-block; min-width: 92px}
-#pm-42ceed8782 .pm-b small {display: inline}
-#pm-42ceed8782 .on.pm-t, #pm-42ceed8782 .on.pm-b {background: #1c355e; border-color: #1c355e; color: #fff}
-#pm-42ceed8782 .on.pm-t small, #pm-42ceed8782 .on.pm-t i, #pm-42ceed8782 .on.pm-b small, #pm-42ceed8782 .on.pm-b i {color: #dfe5ef}
-#pm-42ceed8782 .on.pm-t b::before, #pm-42ceed8782 .on.pm-b b::before {content: "▸ "}
-#pm-42ceed8782 .dim {opacity: .4}
+#pm-ab1b6e8277 .pm-s {border-style: dashed}
+#pm-ab1b6e8277 .pm-b {background: #f9f8f4}
+#pm-ab1b6e8277 .pm-b b {display: inline-block; min-width: 92px}
+#pm-ab1b6e8277 .pm-b small {display: inline}
+#pm-ab1b6e8277 .on.pm-t, #pm-ab1b6e8277 .on.pm-b {background: #1c355e; border-color: #1c355e; color: #fff}
+#pm-ab1b6e8277 .on.pm-t small, #pm-ab1b6e8277 .on.pm-t i, #pm-ab1b6e8277 .on.pm-b small, #pm-ab1b6e8277 .on.pm-b i {color: #dfe5ef}
+#pm-ab1b6e8277 .on.pm-t b::before, #pm-ab1b6e8277 .on.pm-b b::before {content: "▸ "}
+#pm-ab1b6e8277 .dim {opacity: .4}
 </style><div class="pm-here"><b>You are here:</b> DuckDB · store → transform → test → serve</div><div class="pm-g"><div class="pm-col" style="grid-column:3;grid-row:1/8"></div><div class="pm-col" style="grid-column:4;grid-row:1/8"></div><div class="pm-col" style="grid-column:5;grid-row:1/8"></div><div class="pm-col" style="grid-column:6;grid-row:1/8"></div><div class="pm-h" style="grid-column:1;grid-row:1">sources</div><div class="pm-h" style="grid-column:2;grid-row:1">ingest</div><div class="pm-h on" style="grid-column:3;grid-row:1">store</div><div class="pm-h on" style="grid-column:4;grid-row:1">transform</div><div class="pm-h on" style="grid-column:5;grid-row:1">test</div><div class="pm-h on" style="grid-column:6;grid-row:1">serve</div><div class="pm-t dim" style="grid-column:2/3;grid-row:2"><i>D1_3</i><b>dlt</b><small>incremental loads, schema drift</small></div><div class="pm-t on" style="grid-column:3/7;grid-row:2"><i>D1_1</i><b>DuckDB</b><small>the SQL engine in every lab</small></div><div class="pm-t dim" style="grid-column:2/3;grid-row:3"><i>D1_4</i><b>CDC + MERGE</b><small>changes, deletes, SCD2</small></div><div class="pm-t" style="grid-column:3/4;grid-row:3"><i>D1_2</i><b>Parquet</b><small>columnar files</small></div><div class="pm-t" style="grid-column:4/6;grid-row:3"><i>D2_1</i><b>Polars</b><small>DataFrames, lazy plans, checks</small></div><div class="pm-t" style="grid-column:6/7;grid-row:3"><i>D4_4</i><b>Semantic layer</b><small>metrics defined once</small></div><div class="pm-t dim" style="grid-column:2/3;grid-row:4"><i>D3_3 · D3_4</i><b>Streaming</b><small>events as they happen</small></div><div class="pm-t" style="grid-column:3/4;grid-row:4"><i>D3_1</i><b>Iceberg</b><small>tables on files, time travel</small></div><div class="pm-t" style="grid-column:4/6;grid-row:4"><i>D2_2 · D2_3</i><b>dbt</b><small>models, tests, docs, lineage</small></div><div class="pm-t" style="grid-column:6/7;grid-row:4"><i>D4_4</i><b>Embeddings</b><small>search, text-to-SQL</small></div><div class="pm-t" style="grid-column:4/5;grid-row:5"><i>D3_2</i><b>Spark</b><small>the same work on a cluster</small></div><div class="pm-t" style="grid-column:5/6;grid-row:5"><i>D2_4</i><b>Pandera</b><small>schemas for DataFrames</small></div><div class="pm-t" style="grid-column:5/6;grid-row:6"><i>D4_2</i><b>Contracts</b><small>ODCS: what consumers rely on</small></div><div class="pm-s dim" style="grid-column:1;grid-row:2"><b>App database</b><small>qafila_oltp.sqlite</small></div><div class="pm-s dim" style="grid-column:1;grid-row:3"><b>Payments API</b><small>pages, cursor, 429s</small></div><div class="pm-s dim" style="grid-column:1;grid-row:4"><b>CDC feed</b><small>inserts, updates, deletes</small></div><div class="pm-s dim" style="grid-column:1;grid-row:5"><b>Click events</b><small>a stream</small></div><div class="pm-s dim" style="grid-column:1;grid-row:6"><b>Supplier files</b><small>weekly CSVs</small></div><div class="pm-s dim" style="grid-column:1;grid-row:7"><b>Reviews</b><small>free text</small></div><div class="pm-b dim" style="grid-column:2/-1;grid-row:8"><i>D4_1</i><b>Orchestrate</b> <small>Dagster: assets, schedules, checks</small></div><div class="pm-b dim" style="grid-column:2/-1;grid-row:9"><i>D4_2</i><b>Observe</b> <small>freshness, volume, schema, distribution, lineage</small></div><div class="pm-b dim" style="grid-column:2/-1;grid-row:10"><i>D4_3</i><b>Govern</b> <small>PDPL, masking, access</small></div></div></div>
 </div>
 </div>
@@ -7973,8 +7968,8 @@ tool on the map reads from it or writes to it.</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1-%C2%B7-The-problem:-analytics-on-the-app-database">1 · The problem: analytics on the app database<a class="anchor-link" href="#1-%C2%B7-The-problem:-analytics-on-the-app-database">¶</a></h2><p>Finance's question: <strong>revenue per store per day</strong>. The orders live in the app's database, a row store built to
-save one order and fetch one customer quickly. The first try is to ask it directly.</p>
+<h2 id="1-%C2%B7-Finance's-question,-two-databases">1 · Finance's question, two databases<a class="anchor-link" href="#1-%C2%B7-Finance's-question,-two-databases">¶</a></h2><p>Finance's question: <strong>revenue per store per day</strong>. The orders live in the app's database, SQLite, a row store built
+to save one order quickly (OLTP, in the slides). The first try is to ask it directly.</p>
 </div>
 </div>
 </div>
@@ -7997,6 +7992,7 @@ save one order and fetch one customer quickly. The first try is to ask it direct
 <span class="n">app</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">APP</span><span class="p">)</span>
 <span class="k">with</span> <span class="n">U</span><span class="o">.</span><span class="n">timer</span><span class="p">(</span><span class="s2">"the app database (SQLite)"</span><span class="p">,</span> <span class="n">times</span><span class="p">):</span>
     <span class="n">answer</span> <span class="o">=</span> <span class="n">app</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">QUESTION</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+<span class="n">app</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">answer</span><span class="p">),</span> <span class="s2">"rows, first:"</span><span class="p">,</span> <span class="n">answer</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 </pre></div>
 </div>
@@ -8010,7 +8006,7 @@ save one order and fetch one customer quickly. The first try is to ask it direct
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>the app database (SQLite)       1790.2 ms
+<pre>the app database (SQLite)       1218.5 ms
 290 rows, first: ('2026-08-01', 'DMM-01', 514218.42)
 </pre>
 </div>
@@ -8024,8 +8020,10 @@ save one order and fetch one customer quickly. The first try is to ask it direct
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>🔍 Seconds for one small chart, while customers place orders on the same database.</p>
-<p>🤔 <strong>Predict</strong> · Second try: pull the table into pandas and sum there. Faster or slower? How much memory?</p>
+<p>🔍 About a second for one small chart, on a laptop with nobody else using it. In production the same read
+competes with customers placing orders, on a table that grows every day.</p>
+<p>Second try: copy the table once into a DuckDB file, a column store, then ask the same SQL there.</p>
+<p>🤔 <strong>Predict</strong> · How much faster? And will the DuckDB file be bigger or smaller than SQLite's?</p>
 </div>
 </div>
 </div>
@@ -8035,61 +8033,6 @@ save one order and fetch one customer quickly. The first try is to ask it direct
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
 <div class="jp-InputPrompt jp-InputArea-prompt">In [4]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="k">with</span> <span class="n">U</span><span class="o">.</span><span class="n">timer</span><span class="p">(</span><span class="s2">"pull into pandas"</span><span class="p">,</span> <span class="n">times</span><span class="p">):</span>
-    <span class="n">orders_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_sql</span><span class="p">(</span><span class="s2">"SELECT * FROM orders"</span><span class="p">,</span> <span class="n">app</span><span class="p">)</span>
-<span class="k">with</span> <span class="n">U</span><span class="o">.</span><span class="n">timer</span><span class="p">(</span><span class="s2">"compute in pandas"</span><span class="p">,</span> <span class="n">times</span><span class="p">):</span>
-    <span class="n">delivered</span> <span class="o">=</span> <span class="n">orders_df</span><span class="p">[</span><span class="n">orders_df</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"delivered"</span><span class="p">]</span>
-    <span class="n">by_pandas</span> <span class="o">=</span> <span class="n">delivered</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="n">delivered</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">str</span><span class="p">[:</span><span class="mi">10</span><span class="p">],</span> <span class="s2">"store_id"</span><span class="p">])</span><span class="o">.</span><span class="n">amount</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"pandas holds </span><span class="si">{</span><span class="n">orders_df</span><span class="o">.</span><span class="n">memory_usage</span><span class="p">(</span><span class="n">deep</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2"> MB: every row and every column, "</span>
-      <span class="s2">"including the notes we never use"</span><span class="p">)</span>
-<span class="n">app</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>pull into pandas                2699.8 ms
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>compute in pandas                262.1 ms
-pandas holds 104 MB: every row and every column, including the notes we never use
-</pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-009">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>🔍 The computing was quick; <strong>moving</strong> the data was slow. Every value left SQLite as a Python object, just to sum
-one column.</p>
-<p>Third try: copy the table once into a DuckDB file, then ask there.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-010">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [5]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">with</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/analytics.duckdb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">con</span><span class="p">:</span>
@@ -8114,10 +8057,10 @@ one column.</p>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>copy into DuckDB (once)         1851.3 ms
-the question in DuckDB            38.6 ms
-the question in DuckDB            28.6 ms
-the question in DuckDB            31.5 ms
+<pre>copy into DuckDB (once)         1468.3 ms
+the question in DuckDB            31.0 ms
+the question in DuckDB            27.4 ms
+the question in DuckDB            26.9 ms
 ✅ the same answer as SQLite
 
 file sizes: SQLite 80 MB · DuckDB 13 MB
@@ -8126,15 +8069,15 @@ file sizes: SQLite 80 MB · DuckDB 13 MB
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-011">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-009">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [6]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [5]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">V</span><span class="o">.</span><span class="n">bars</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"way"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">times</span><span class="p">),</span> <span class="s2">"seconds"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">values</span><span class="p">())}),</span> <span class="s2">"way"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"seconds"</span><span class="p">],</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">V</span><span class="o">.</span><span class="n">bars</span><span class="p">({</span><span class="s2">"way"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">times</span><span class="p">),</span> <span class="s2">"seconds"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">values</span><span class="p">())},</span> <span class="s2">"way"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"seconds"</span><span class="p">],</span>
        <span class="n">suptitle</span><span class="o">=</span><span class="s2">"Revenue per store per day: where the time goes"</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s2">"</span><span class="si">{:.2f}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -8148,8 +8091,23 @@ file sizes: SQLite 80 MB · DuckDB 13 MB
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedImage jp-OutputArea-output" tabindex="0">
-<img alt="No description has been provided for this image" class="" src="data:image/png;base64,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"/>
+<img alt="No description has been provided for this image" class="" src="data:image/png;base64,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"/>
 </div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-010">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>🔍 The same answer in a fraction of the time, from a file several times smaller. The rows didn't change, only how
+they are stored: DuckDB read the four columns the question names and skipped <code>order_id</code> and the notes, and
+similar values side by side compressed well (the slides' column board).</p>
+<p>Two more things make it fast. It runs <strong>in your Python process</strong>, like SQLite: no server, nothing to install but the
+package. And it works on batches of about 2,048 values at a time, on every CPU core.</p>
 </div>
 </div>
 </div>
@@ -8160,107 +8118,16 @@ file sizes: SQLite 80 MB · DuckDB 13 MB
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>🔍 The same answer in a fraction of the time, from a file several times smaller. The data didn't change; only how
-it is stored and processed did.</p>
+<h2 id="2-%C2%B7-A-connection-and-a-database-file">2 · A connection and a database file<a class="anchor-link" href="#2-%C2%B7-A-connection-and-a-database-file">¶</a></h2>
 </div>
 </div>
 </div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-014">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="2-%C2%B7-The-mental-model:-in-process,-columnar,-vectorized">2 · The mental model: in-process, columnar, vectorized<a class="anchor-link" href="#2-%C2%B7-The-mental-model:-in-process,-columnar,-vectorized">¶</a></h2><pre><code> ROW STORE (SQLite, PostgreSQL)              COLUMN STORE (DuckDB, Parquet, Snowflake)
- page 1: [1, RUH-04, 08-01, 275.86, …, note] order_id: [1, 2, 3, 4, …]        ← skipped
- page 2: [2, JED-03, 08-01,  33.65, …, note] store_id: [RUH-04, JED-03, …]    ← read
- page 3: [3, RUH-04, 08-01,  12.00, …, note] amount:   [275.86, 33.65, …]     ← read
-         sum(amount) reads every page        note:     [...]                  ← skipped
-                                             similar values side by side compress well
-</code></pre>
-<table>
-<thead>
-<tr>
-<th>Idea</th>
-<th>What it means</th>
-<th>You saw it in §1</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>In-process</strong></td>
-<td>a library inside your Python process, like SQLite; no server, no network</td>
-<td><code>duckdb.connect()</code>, nothing to install but the package</td>
-</tr>
-<tr>
-<td><strong>Columnar</strong></td>
-<td>each column stored apart, compressed</td>
-<td>reads 3 of 6 columns; a smaller file</td>
-</tr>
-<tr>
-<td><strong>Vectorized</strong></td>
-<td>each operator works on batches of ~2,048 values, on all CPU cores</td>
-<td>a GROUP BY over 1M rows in a blink</td>
-</tr>
-</tbody>
-</table>
-<table>
-<thead>
-<tr>
-<th></th>
-<th>Runs</th>
-<th>Stores rows as</th>
-<th>Built for</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>SQLite</td>
-<td>in your process</td>
-<td>rows</td>
-<td>an app's own data: many small reads and writes</td>
-</tr>
-<tr>
-<td>PostgreSQL, MySQL</td>
-<td>a server</td>
-<td>rows</td>
-<td>many users writing small transactions</td>
-</tr>
-<tr>
-<td><strong>DuckDB</strong></td>
-<td><strong>in your process</strong></td>
-<td><strong>columns</strong></td>
-<td><strong>analytics on one machine</strong></td>
-</tr>
-<tr>
-<td>Snowflake, BigQuery, Redshift</td>
-<td>a managed service</td>
-<td>columns</td>
-<td>analytics on a cluster, shared by a company</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-015">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="3-%C2%B7-A-query,-a-connection,-a-database-file">3 · A query, a connection, a database file<a class="anchor-link" href="#3-%C2%B7-A-query,-a-connection,-a-database-file">¶</a></h2>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-016">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-013">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [7]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [6]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">duckdb</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SELECT 42 AS answer, 'مرحبا' AS greeting"</span><span class="p">)</span>
@@ -8274,7 +8141,7 @@ it is stored and processed did.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[7]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[6]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <table class="dataframe"><thead><tr><th>answer<br/><small>INTEGER</small></th><th>greeting<br/><small>VARCHAR</small></th></tr></thead><tbody><tr><td>42</td><td>مرحبا</td></tr></tbody></table>
 </div>
@@ -8282,7 +8149,7 @@ it is stored and processed did.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-017">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-014">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8292,12 +8159,12 @@ it is stored and processed did.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-018">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-015">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [8]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [7]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">FILES</span> <span class="o">=</span> <span class="p">{</span>
@@ -8342,12 +8209,12 @@ it is stored and processed did.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-019">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-016">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [9]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [8]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">duckdb</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT * FROM '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_2026-09-14.csv'"</span><span class="p">)</span>
@@ -8361,7 +8228,7 @@ it is stored and processed did.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[9]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[8]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <table class="dataframe"><thead><tr><th>order_id<br/><small>BIGINT</small></th><th>store_id<br/><small>VARCHAR</small></th><th>status<br/><small>VARCHAR</small></th><th>amount<br/><small>DOUBLE</small></th><th>delivery_fee<br/><small>DOUBLE</small></th></tr></thead><tbody><tr><td>101</td><td>RUH-04</td><td>delivered</td><td>275.86</td><td>9.0</td></tr><tr><td>102</td><td>JED-03</td><td>delivered</td><td>33.65</td><td>9.0</td></tr><tr><td>103</td><td>RUH-04</td><td>cancelled</td><td>12.0</td><td>0.0</td></tr></tbody></table>
 </div>
@@ -8369,7 +8236,7 @@ it is stored and processed did.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-020">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-017">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8382,12 +8249,12 @@ or to a <strong>database file</strong>.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-021">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-018">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [10]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [9]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">mem</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>                 <span class="c1"># in memory</span>
@@ -8417,12 +8284,12 @@ or to a <strong>database file</strong>.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-022">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-019">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [11]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [10]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">DB</span> <span class="o">=</span> <span class="n">OUT</span> <span class="o">/</span> <span class="s2">"qafila_toy.duckdb"</span>
@@ -8450,7 +8317,7 @@ or to a <strong>database file</strong>.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-023">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-020">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8480,7 +8347,7 @@ keeps every table in one file, like SQLite. The course's warehouse is <code>ware
 </tr>
 <tr>
 <td><code>duckdb.connect("x.duckdb", read_only=True)</code></td>
-<td>the same file, without the right to change it (§5)</td>
+<td>the same file, without the right to change it (§4)</td>
 </tr>
 <tr>
 <td><code>with duckdb.connect(...) as con:</code></td>
@@ -8492,29 +8359,29 @@ keeps every table in one file, like SQLite. The course's warehouse is <code>ware
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-024">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-021">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="4-%C2%B7-Files-where-they-are:-CSV,-globs,-JSON,-Parquet">4 · Files where they are: CSV, globs, JSON, Parquet<a class="anchor-link" href="#4-%C2%B7-Files-where-they-are:-CSV,-globs,-JSON,-Parquet">¶</a></h2><p>A CSV has no types, so DuckDB <strong>sniffs</strong> them from a sample of rows. <code>DESCRIBE</code> shows what it decided.</p>
+<h2 id="3-%C2%B7-Files-where-they-are:-CSV,-globs,-JSON,-Parquet">3 · Files where they are: CSV, globs, JSON, Parquet<a class="anchor-link" href="#3-%C2%B7-Files-where-they-are:-CSV,-globs,-JSON,-Parquet">¶</a></h2><p>A CSV has no types, so DuckDB <strong>sniffs</strong> them from a sample of rows. <code>DESCRIBE</code> shows what it decided.</p>
 <p>🤔 <strong>Predict</strong> · On 15 September one fee says <code>free</code>. Which type does <code>delivery_fee</code> get in that file?</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-025">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-022">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [12]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [11]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>                 <span class="c1"># in memory, for the rest of the notebook</span>
 <span class="k">for</span> <span class="n">day</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"2026-09-14"</span><span class="p">,</span> <span class="s2">"2026-09-15"</span><span class="p">]:</span>
-    <span class="n">types</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"DESCRIBE FROM '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_</span><span class="si">{</span><span class="n">day</span><span class="si">}</span><span class="s2">.csv'"</span><span class="p">)</span><span class="o">.</span><span class="n">df</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">day</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">types</span><span class="o">.</span><span class="n">column_name</span><span class="p">,</span> <span class="n">types</span><span class="o">.</span><span class="n">column_type</span><span class="p">)))</span>
+    <span class="n">types</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT column_name, column_type FROM (DESCRIBE FROM '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_</span><span class="si">{</span><span class="n">day</span><span class="si">}</span><span class="s2">.csv')"</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">day</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">types</span><span class="p">))</span>
 </pre></div>
 </div>
 </div>
@@ -8535,7 +8402,7 @@ keeps every table in one file, like SQLite. The course's warehouse is <code>ware
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-026">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-023">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8546,12 +8413,12 @@ before trusting a file. Then take the decision yourself: state the type, and con
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-027">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-024">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [13]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [12]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"""</span>
@@ -8568,7 +8435,7 @@ before trusting a file. Then take the decision yourself: state the type, and con
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[13]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[12]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <table class="dataframe"><thead><tr><th>order_id<br/><small>BIGINT</small></th><th>as_sent<br/><small>VARCHAR</small></th><th>delivery_fee_sar<br/><small>DECIMAL(12,2)</small></th></tr></thead><tbody><tr><td>104</td><td>9.00</td><td>9.00</td></tr><tr><td>105</td><td>free</td><td>0.00</td></tr><tr><td>106</td><td>9.00</td><td>9.00</td></tr></tbody></table>
 </div>
@@ -8576,7 +8443,7 @@ before trusting a file. Then take the decision yourself: state the type, and con
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-028">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-025">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8589,12 +8456,12 @@ be read and tested.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-029">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-026">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [14]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [13]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT * FROM read_csv('</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_*.csv')"</span><span class="p">)</span>
@@ -8608,7 +8475,7 @@ be read and tested.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[14]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[13]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <table class="dataframe"><thead><tr><th>order_id<br/><small>BIGINT</small></th><th>store_id<br/><small>VARCHAR</small></th><th>status<br/><small>VARCHAR</small></th><th>amount<br/><small>DOUBLE</small></th><th>delivery_fee<br/><small>VARCHAR</small></th></tr></thead><tbody><tr><td>101</td><td>RUH-04</td><td>delivered</td><td>275.86</td><td>9.00</td></tr><tr><td>102</td><td>JED-03</td><td>delivered</td><td>33.65</td><td>9.00</td></tr><tr><td>103</td><td>RUH-04</td><td>cancelled</td><td>12.0</td><td>0.00</td></tr><tr><td>104</td><td>RUH-04</td><td>delivered</td><td>58.1</td><td>9.00</td></tr><tr><td>105</td><td>DMM-01</td><td>delivered</td><td>19.9</td><td>free</td></tr><tr><td>106</td><td>JED-03</td><td>delivered</td><td>44.0</td><td>9.00</td></tr><tr><td>107</td><td>RUH-04</td><td>delivered</td><td>8.75</td><td>9.00</td></tr><tr><td>108</td><td>JED-03</td><td>delivered</td><td>120.0</td><td>0.00</td></tr><tr><td>109</td><td>DMM-01</td><td>delivered</td><td>61.25</td><td>9.00</td></tr><tr><td>110</td><td>RUH-04</td><td>cancelled</td><td>15.5</td><td>0.00</td></tr></tbody></table>
 </div>
@@ -8616,7 +8483,7 @@ be read and tested.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-030">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-027">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8629,12 +8496,12 @@ column was silently dropped. (One <code>free</code> in one file also made <code>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-031">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-028">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [15]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [14]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"""</span>
@@ -8651,7 +8518,7 @@ column was silently dropped. (One <code>free</code> in one file also made <code>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[15]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[14]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <table class="dataframe"><thead><tr><th>order_id<br/><small>BIGINT</small></th><th>store_id<br/><small>VARCHAR</small></th><th>amount<br/><small>DOUBLE</small></th><th>promo_code<br/><small>VARCHAR</small></th><th>file<br/><small>VARCHAR</small></th></tr></thead><tbody><tr><td>101</td><td>RUH-04</td><td>275.86</td><td>NULL</td><td>orders_2026-09-14.csv</td></tr><tr><td>102</td><td>JED-03</td><td>33.65</td><td>NULL</td><td>orders_2026-09-14.csv</td></tr><tr><td>103</td><td>RUH-04</td><td>12.0</td><td>NULL</td><td>orders_2026-09-14.csv</td></tr><tr><td>104</td><td>RUH-04</td><td>58.1</td><td>NULL</td><td>orders_2026-09-15.csv</td></tr><tr><td>105</td><td>DMM-01</td><td>19.9</td><td>NULL</td><td>orders_2026-09-15.csv</td></tr><tr><td>106</td><td>JED-03</td><td>44.0</td><td>NULL</td><td>orders_2026-09-15.csv</td></tr><tr><td>107</td><td>RUH-04</td><td>8.75</td><td>YAWM96</td><td>orders_2026-09-16.csv</td></tr><tr><td>108</td><td>JED-03</td><td>120.0</td><td>NULL</td><td>orders_2026-09-16.csv</td></tr><tr><td>109</td><td>DMM-01</td><td>61.25</td><td>YAWM96</td><td>orders_2026-09-16.csv</td></tr><tr><td>110</td><td>RUH-04</td><td>15.5</td><td>NULL</td><td>orders_2026-09-16.csv</td></tr></tbody></table>
 </div>
@@ -8659,7 +8526,7 @@ column was silently dropped. (One <code>free</code> in one file also made <code>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-032">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-029">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8670,12 +8537,12 @@ gives one row per element). The app's API sends orders like this:</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-033">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-030">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [16]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [15]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="p">(</span><span class="n">OUT</span> <span class="o">/</span> <span class="s2">"order_details.jsonl"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
@@ -8683,7 +8550,7 @@ gives one row per element). The app's API sends orders like this:</p>
     <span class="s1">'"items": [{"sku": "TEA-01", "qty": 2}, {"sku": "DATES-1KG", "qty": 1}]}</span><span class="se">\n</span><span class="s1">'</span>
     <span class="s1">'{"order_id": 105, "courier": {"id": "C-22", "vehicle": "car"}, "items": [{"sku": "MILK-2L", "qty": 3}]}</span><span class="se">\n</span><span class="s1">'</span><span class="p">,</span>
     <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span>
-<span class="n">display</span><span class="p">(</span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"DESCRIBE FROM '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/order_details.jsonl'"</span><span class="p">)</span><span class="o">.</span><span class="n">df</span><span class="p">()[[</span><span class="s2">"column_name"</span><span class="p">,</span> <span class="s2">"column_type"</span><span class="p">]])</span>
+<span class="n">display</span><span class="p">(</span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT column_name, column_type FROM (DESCRIBE FROM '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/order_details.jsonl')"</span><span class="p">))</span>
 <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"""</span>
 <span class="s2">    SELECT order_id, courier.vehicle, unnest(items, recursive := true)</span>
 <span class="s2">    FROM '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/order_details.jsonl'"""</span><span class="p">)</span>
@@ -8699,51 +8566,11 @@ gives one row per element). The app's API sends orders like this:</p>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<div>
-<style scoped="">
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-<thead>
-<tr style="text-align: right;">
-<th></th>
-<th>column_name</th>
-<th>column_type</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<th>0</th>
-<td>order_id</td>
-<td>BIGINT</td>
-</tr>
-<tr>
-<th>1</th>
-<td>courier</td>
-<td>STRUCT(id VARCHAR, vehicle VARCHAR)</td>
-</tr>
-<tr>
-<th>2</th>
-<td>items</td>
-<td>STRUCT(sku VARCHAR, qty BIGINT)[]</td>
-</tr>
-</tbody>
-</table>
-</div>
+<table class="dataframe"><thead><tr><th>column_name<br/><small>VARCHAR</small></th><th>column_type<br/><small>VARCHAR</small></th></tr></thead><tbody><tr><td>order_id</td><td>BIGINT</td></tr><tr><td>courier</td><td>STRUCT(id VARCHAR, vehicle VARCHAR)</td></tr><tr><td>items</td><td>STRUCT(sku VARCHAR, qty BIGINT)[]</td></tr></tbody></table>
 </div>
 </div>
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[16]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[15]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <table class="dataframe"><thead><tr><th>order_id<br/><small>BIGINT</small></th><th>vehicle<br/><small>VARCHAR</small></th><th>sku<br/><small>VARCHAR</small></th><th>qty<br/><small>BIGINT</small></th></tr></thead><tbody><tr><td>104</td><td>bike</td><td>TEA-01</td><td>2</td></tr><tr><td>104</td><td>bike</td><td>DATES-1KG</td><td>1</td></tr><tr><td>105</td><td>car</td><td>MILK-2L</td><td>3</td></tr></tbody></table>
 </div>
@@ -8751,28 +8578,28 @@ gives one row per element). The app's API sends orders like this:</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-034">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-031">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>➕ <strong>Parquet</strong> is the course's columnar file format (Lab 1.2). <code>COPY ... TO</code> writes any query to a file. Reading it
-back needs no options, because the types are stored in the file.</p>
+<p>➕ <strong>Parquet</strong> is a column store in a file, the format of the slides' second part and Lab 1.2. <code>COPY ... TO</code> writes
+any query to a file. Reading it back needs no options, because the types are stored in the file.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-035">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-032">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [17]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [16]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"""COPY (SELECT * FROM read_csv('</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_*.csv', union_by_name = true))</span>
 <span class="s2">            TO '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders.parquet' (FORMAT parquet)"""</span><span class="p">)</span>
-<span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"DESCRIBE FROM '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders.parquet'"</span><span class="p">)</span><span class="o">.</span><span class="n">df</span><span class="p">()[[</span><span class="s2">"column_name"</span><span class="p">,</span> <span class="s2">"column_type"</span><span class="p">]]</span>
+<span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT column_name, column_type FROM (DESCRIBE FROM '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders.parquet')"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -8783,70 +8610,15 @@ back needs no options, because the types are stored in the file.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[17]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[16]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<div>
-<style scoped="">
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-<thead>
-<tr style="text-align: right;">
-<th></th>
-<th>column_name</th>
-<th>column_type</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<th>0</th>
-<td>order_id</td>
-<td>BIGINT</td>
-</tr>
-<tr>
-<th>1</th>
-<td>store_id</td>
-<td>VARCHAR</td>
-</tr>
-<tr>
-<th>2</th>
-<td>status</td>
-<td>VARCHAR</td>
-</tr>
-<tr>
-<th>3</th>
-<td>amount</td>
-<td>DOUBLE</td>
-</tr>
-<tr>
-<th>4</th>
-<td>delivery_fee</td>
-<td>VARCHAR</td>
-</tr>
-<tr>
-<th>5</th>
-<td>promo_code</td>
-<td>VARCHAR</td>
-</tr>
-</tbody>
-</table>
+<table class="dataframe"><thead><tr><th>column_name<br/><small>VARCHAR</small></th><th>column_type<br/><small>VARCHAR</small></th></tr></thead><tbody><tr><td>order_id</td><td>BIGINT</td></tr><tr><td>store_id</td><td>VARCHAR</td></tr><tr><td>status</td><td>VARCHAR</td></tr><tr><td>amount</td><td>DOUBLE</td></tr><tr><td>delivery_fee</td><td>VARCHAR</td></tr><tr><td>promo_code</td><td>VARCHAR</td></tr></tbody></table>
 </div>
 </div>
 </div>
 </div>
 </div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-036">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-033">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8897,22 +8669,22 @@ back needs no options, because the types are stored in the file.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-038">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-035">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="5-%C2%B7-Tables,-views,-other-databases,-and-one-writer-at-a-time">5 · Tables, views, other databases, and one writer at a time<a class="anchor-link" href="#5-%C2%B7-Tables,-views,-other-databases,-and-one-writer-at-a-time">¶</a></h2><p>A <strong>table</strong> is a copy, taken once. A <strong>view</strong> is a saved query, run again each time it is used.</p>
+<h2 id="4-%C2%B7-Tables,-views,-other-databases,-and-one-writer-at-a-time">4 · Tables, views, other databases, and one writer at a time<a class="anchor-link" href="#4-%C2%B7-Tables,-views,-other-databases,-and-one-writer-at-a-time">¶</a></h2><p>A <strong>table</strong> is a copy, taken once. A <strong>view</strong> is a saved query, run again each time it is used.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-039">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-036">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [18]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [17]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">wh</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">DB</span><span class="p">))</span>
@@ -8929,7 +8701,7 @@ back needs no options, because the types are stored in the file.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[18]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[17]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <table class="dataframe"><thead><tr><th>in_table<br/><small>BIGINT</small></th><th>in_view<br/><small>BIGINT</small></th></tr></thead><tbody><tr><td>10</td><td>10</td></tr></tbody></table>
 </div>
@@ -8937,7 +8709,7 @@ back needs no options, because the types are stored in the file.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-040">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-037">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8947,12 +8719,12 @@ back needs no options, because the types are stored in the file.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-041">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-038">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [19]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [18]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="p">(</span><span class="n">OUT</span> <span class="o">/</span> <span class="s2">"orders_2026-09-17.csv"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
@@ -8968,7 +8740,7 @@ back needs no options, because the types are stored in the file.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[19]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[18]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <table class="dataframe"><thead><tr><th>in_table<br/><small>BIGINT</small></th><th>in_view<br/><small>BIGINT</small></th></tr></thead><tbody><tr><td>10</td><td>11</td></tr></tbody></table>
 </div>
@@ -8976,7 +8748,7 @@ back needs no options, because the types are stored in the file.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-042">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-039">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8989,16 +8761,16 @@ the app database: <code>ATTACH</code> with <code>TYPE sqlite</code> (PostgreSQL 
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-043">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-040">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [20]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [19]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">wh</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ATTACH '</span><span class="si">{</span><span class="n">APP</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span><span class="si">}</span><span class="s2">' AS app (TYPE sqlite, READ_ONLY)"</span><span class="p">)</span>
-<span class="n">display</span><span class="p">(</span><span class="n">wh</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SELECT database_name, schema_name, table_name FROM duckdb_tables() ORDER BY ALL"</span><span class="p">)</span><span class="o">.</span><span class="n">df</span><span class="p">())</span>
+<span class="n">display</span><span class="p">(</span><span class="n">wh</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SELECT database_name, schema_name, table_name FROM duckdb_tables() ORDER BY ALL"</span><span class="p">))</span>
 <span class="n">wh</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"""</span>
 <span class="s2">    SELECT o.store_id, count(*) AS toy_orders, any_value(a.n) AS orders_in_app</span>
 <span class="s2">    FROM orders o</span>
@@ -9016,55 +8788,11 @@ the app database: <code>ATTACH</code> with <code>TYPE sqlite</code> (PostgreSQL 
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
-<div>
-<style scoped="">
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-<thead>
-<tr style="text-align: right;">
-<th></th>
-<th>database_name</th>
-<th>schema_name</th>
-<th>table_name</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<th>0</th>
-<td>app</td>
-<td>main</td>
-<td>orders</td>
-</tr>
-<tr>
-<th>1</th>
-<td>qafila_toy</td>
-<td>main</td>
-<td>hello</td>
-</tr>
-<tr>
-<th>2</th>
-<td>qafila_toy</td>
-<td>main</td>
-<td>orders</td>
-</tr>
-</tbody>
-</table>
-</div>
+<table class="dataframe"><thead><tr><th>database_name<br/><small>VARCHAR</small></th><th>schema_name<br/><small>VARCHAR</small></th><th>table_name<br/><small>VARCHAR</small></th></tr></thead><tbody><tr><td>app</td><td>main</td><td>orders</td></tr><tr><td>qafila_toy</td><td>main</td><td>hello</td></tr><tr><td>qafila_toy</td><td>main</td><td>orders</td></tr></tbody></table>
 </div>
 </div>
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[20]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[19]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <table class="dataframe"><thead><tr><th>store_id<br/><small>VARCHAR</small></th><th>toy_orders<br/><small>BIGINT</small></th><th>orders_in_app<br/><small>BIGINT</small></th></tr></thead><tbody><tr><td>DMM-01</td><td>2</td><td>200000</td></tr><tr><td>JED-03</td><td>3</td><td>200000</td></tr><tr><td>RUH-04</td><td>5</td><td>200000</td></tr></tbody></table>
 </div>
@@ -9072,7 +8800,7 @@ the app database: <code>ATTACH</code> with <code>TYPE sqlite</code> (PostgreSQL 
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-044">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-041">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9085,12 +8813,12 @@ opens the same file.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-045">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-042">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [21]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [20]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">READER</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"import duckdb; print(duckdb.connect(r'</span><span class="si">{</span><span class="n">DB</span><span class="si">}</span><span class="s2">', read_only=True).sql('SELECT count(*) FROM orders').fetchall()[0])"</span>
@@ -9115,7 +8843,7 @@ opens the same file.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-046">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-043">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9126,12 +8854,12 @@ connection and try again:</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-047">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-044">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [22]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [21]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">wh</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
@@ -9156,7 +8884,7 @@ connection and try again:</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-048">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-045">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9174,65 +8902,31 @@ like Iceberg (Day 3).</li>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-049">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-046">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="6-%C2%B7-Python-in-and-out:-DataFrames,-relations,-parameters">6 · Python in and out: DataFrames, relations, parameters<a class="anchor-link" href="#6-%C2%B7-Python-in-and-out:-DataFrames,-relations,-parameters">¶</a></h2><p><strong>In:</strong> a pandas (or Polars, or Arrow) DataFrame in a Python variable can be queried by its <strong>name</strong>.</p>
+<h2 id="5-%C2%B7-Results-into-Python">5 · Results into Python<a class="anchor-link" href="#5-%C2%B7-Results-into-Python">¶</a></h2><p>A query shows as a table in the notebook. When the next step is Python code, take the rows out:</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-050">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-047">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [23]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [22]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">targets</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"store_id"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"RUH-04"</span><span class="p">,</span> <span class="s2">"JED-03"</span><span class="p">,</span> <span class="s2">"DMM-01"</span><span class="p">],</span> <span class="s2">"daily_target"</span><span class="p">:</span> <span class="p">[</span><span class="mf">150.0</span><span class="p">,</span> <span class="mf">50.0</span><span class="p">,</span> <span class="mf">35.0</span><span class="p">]})</span>
-<span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SELECT * FROM targets WHERE daily_target &gt; 40"</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[23]:</div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<table class="dataframe"><thead><tr><th>store_id<br/><small>VARCHAR</small></th><th>daily_target<br/><small>DOUBLE</small></th></tr></thead><tbody><tr><td>RUH-04</td><td>150.0</td></tr><tr><td>JED-03</td><td>50.0</td></tr></tbody></table>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-051">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><strong>Out:</strong> a result converts to whatever the next step needs.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-052">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [24]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SELECT store_id, daily_target FROM targets ORDER BY store_id"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">df</span><span class="p">())</span><span class="o">.</span><span class="vm">__module__</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">pl</span><span class="p">())</span><span class="o">.</span><span class="vm">__module__</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">to_arrow_table</span><span class="p">())</span><span class="o">.</span><span class="vm">__module__</span><span class="p">)</span>
-<span class="n">result</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">revenue</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"""</span>
+<span class="s2">    SELECT store_id, round(sum(amount), 2) AS revenue</span>
+<span class="s2">    FROM read_csv('</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_*.csv', union_by_name = true)</span>
+<span class="s2">    WHERE status = 'delivered'</span>
+<span class="s2">    GROUP BY ALL ORDER BY revenue DESC"""</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">revenue</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"top store:"</span><span class="p">,</span> <span class="n">revenue</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
 </pre></div>
 </div>
 </div>
@@ -9245,20 +8939,15 @@ like Iceberg (Day 3).</li>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>pandas polars.dataframe.frame pyarrow.lib
+<pre>[('RUH-04', 342.71), ('JED-03', 225.05), ('DMM-01', 81.15)]
+top store: RUH-04
 </pre>
 </div>
 </div>
-<div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[24]:</div>
-<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
-<pre>[('DMM-01', 35.0), ('JED-03', 50.0), ('RUH-04', 150.0)]</pre>
 </div>
 </div>
 </div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-053">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-048">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9273,129 +8962,39 @@ like Iceberg (Day 3).</li>
 </thead>
 <tbody>
 <tr>
+<td><code>.fetchall()</code></td>
+<td>a list of rows, each a tuple: <code>[0][0]</code> is the first value of the first row</td>
+</tr>
+<tr>
 <td><code>.df()</code></td>
-<td>a pandas DataFrame</td>
+<td>a table Python can chart or save (a pandas DataFrame; the labs only display it)</td>
 </tr>
 <tr>
 <td><code>.pl()</code></td>
 <td>a Polars DataFrame (Day 2)</td>
 </tr>
 <tr>
-<td><code>.to_arrow_table()</code></td>
-<td>an Arrow table (PyIceberg, Day 3)</td>
-</tr>
-<tr>
-<td><code>.fetchall()</code></td>
-<td>a list of Python tuples</td>
-</tr>
-<tr>
-<td><code>.show()</code></td>
-<td>prints a preview</td>
+<td><code>.columns</code></td>
+<td>the column names</td>
 </tr>
 </tbody>
 </table>
-<p>Older tutorials use <code>.fetchone()</code>, which relations lost in DuckDB 2.0: take <code>.fetchall()[0]</code> instead.</p>
-<p>What <code>con.sql(...)</code> returns is a <strong>relation</strong>: a query that runs when you ask for rows, and again <strong>every time</strong>
-you ask.</p>
-<p>🤔 <strong>Predict</strong> · We keep a relation that counts the orders in the files, then Friday's file arrives. What does the
-same relation say?</p>
+<p>➕ <strong>Parameters.</strong> A value from Python (a date, a store picked in a dashboard) goes in as a <code>?</code>, not pasted into the
+SQL string: no quoting bugs and no SQL injection.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-054">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-049">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [25]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">order_count</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT count(*) AS orders FROM read_csv('</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_*.csv', union_by_name = true)"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"before:"</span><span class="p">,</span> <span class="n">order_count</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
-<span class="p">(</span><span class="n">OUT</span> <span class="o">/</span> <span class="s2">"orders_2026-09-18.csv"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
-    <span class="s2">"order_id,store_id,status,amount,delivery_fee,promo_code</span><span class="se">\n</span><span class="s2">112,DMM-01,delivered,33.00,9.00,</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"after: "</span><span class="p">,</span> <span class="n">order_count</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>before: [(11,)]
-after:  [(12,)]
-</pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-055">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>🔍 A relation behaves like a view: cheap to keep, re-run (glob included) when used. Call <code>.df()</code> once for a fixed
-result. Relations also chain, the style Polars uses (Day 2):</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-056">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [26]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">files</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_*.csv"</span><span class="p">,</span> <span class="n">union_by_name</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">files</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">"status = 'delivered'"</span><span class="p">)</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span><span class="s2">"store_id, round(sum(amount), 2) AS revenue"</span><span class="p">)</span><span class="o">.</span><span class="n">order</span><span class="p">(</span><span class="s2">"revenue DESC"</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[26]:</div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<table class="dataframe"><thead><tr><th>store_id<br/><small>VARCHAR</small></th><th>revenue<br/><small>DOUBLE</small></th></tr></thead><tbody><tr><td>RUH-04</td><td>342.71</td></tr><tr><td>JED-03</td><td>225.05</td></tr><tr><td>DMM-01</td><td>114.15</td></tr></tbody></table>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-057">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>➕ <strong>Parameters.</strong> A value from Python (a date, a store picked in a dashboard) goes in as a parameter, not pasted into
-the SQL string: no quoting bugs and no SQL injection.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-058">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [27]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [23]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">store</span> <span class="o">=</span> <span class="s2">"JED-03"</span>
 <span class="n">con</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SELECT order_id, amount FROM read_csv('</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_*.csv', union_by_name = true) WHERE store_id = ?"</span><span class="p">,</span>
-            <span class="p">[</span><span class="n">store</span><span class="p">])</span><span class="o">.</span><span class="n">df</span><span class="p">()</span>
+            <span class="p">[</span><span class="n">store</span><span class="p">])</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
@@ -9406,82 +9005,36 @@ the SQL string: no quoting bugs and no SQL injection.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[27]:</div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<div>
-<style scoped="">
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-<thead>
-<tr style="text-align: right;">
-<th></th>
-<th>order_id</th>
-<th>amount</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<th>0</th>
-<td>102</td>
-<td>33.65</td>
-</tr>
-<tr>
-<th>1</th>
-<td>106</td>
-<td>44.00</td>
-</tr>
-<tr>
-<th>2</th>
-<td>108</td>
-<td>120.00</td>
-</tr>
-<tr>
-<th>3</th>
-<td>111</td>
-<td>27.40</td>
-</tr>
-</tbody>
-</table>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[23]:</div>
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
+<pre>[(102, 33.65), (106, 44.0), (108, 120.0), (111, 27.4)]</pre>
 </div>
 </div>
 </div>
 </div>
 </div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-059">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-050">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="7-%C2%B7-Friendly-SQL-%E2%9E%95">7 · Friendly SQL ➕<a class="anchor-link" href="#7-%C2%B7-Friendly-SQL-%E2%9E%95">¶</a></h2><p>DuckDB's SQL is PostgreSQL-like, plus shortcuts the labs use.</p>
+<h2 id="6-%C2%B7-Friendly-SQL-%E2%9E%95">6 · Friendly SQL ➕<a class="anchor-link" href="#6-%C2%B7-Friendly-SQL-%E2%9E%95">¶</a></h2><p>DuckDB's SQL is PostgreSQL-like, plus shortcuts the labs use.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-060">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-051">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [28]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [24]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CREATE OR REPLACE TABLE o AS FROM read_csv('</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/orders_*.csv', union_by_name = true)"</span><span class="p">)</span>
 <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"""</span>
 <span class="s2">    FROM o                                         -- FROM first; SELECT * is implied</span>
 <span class="s2">    SELECT * EXCLUDE (delivery_fee, promo_code)    -- every column but these</span>
-<span class="s2">             REPLACE (round(amount) AS amount)     -- ...with this one changed</span>
 <span class="s2">    WHERE status = 'delivered'</span>
 <span class="s2">    LIMIT 3"""</span><span class="p">)</span>
 </pre></div>
@@ -9494,23 +9047,23 @@ the SQL string: no quoting bugs and no SQL injection.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[28]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[24]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<table class="dataframe"><thead><tr><th>order_id<br/><small>BIGINT</small></th><th>store_id<br/><small>VARCHAR</small></th><th>status<br/><small>VARCHAR</small></th><th>amount<br/><small>DOUBLE</small></th></tr></thead><tbody><tr><td>101</td><td>RUH-04</td><td>delivered</td><td>276.0</td></tr><tr><td>102</td><td>JED-03</td><td>delivered</td><td>34.0</td></tr><tr><td>104</td><td>RUH-04</td><td>delivered</td><td>58.0</td></tr></tbody></table>
+<table class="dataframe"><thead><tr><th>order_id<br/><small>BIGINT</small></th><th>store_id<br/><small>VARCHAR</small></th><th>status<br/><small>VARCHAR</small></th><th>amount<br/><small>DOUBLE</small></th></tr></thead><tbody><tr><td>101</td><td>RUH-04</td><td>delivered</td><td>275.86</td></tr><tr><td>102</td><td>JED-03</td><td>delivered</td><td>33.65</td></tr><tr><td>104</td><td>RUH-04</td><td>delivered</td><td>58.1</td></tr></tbody></table>
 </div>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-061">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-052">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [29]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [25]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"""</span>
-<span class="s2">    SELECT store_id, status, count(*) AS orders, max_by(order_id, amount) AS biggest_order</span>
+<span class="s2">    SELECT store_id, status, count(*) AS orders</span>
 <span class="s2">    FROM o</span>
 <span class="s2">    GROUP BY ALL                                   -- group by every column that isn't aggregated</span>
 <span class="s2">    ORDER BY ALL                                   -- order by every column, left to right"""</span><span class="p">)</span>
@@ -9524,22 +9077,22 @@ the SQL string: no quoting bugs and no SQL injection.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[29]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[25]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<table class="dataframe"><thead><tr><th>store_id<br/><small>VARCHAR</small></th><th>status<br/><small>VARCHAR</small></th><th>orders<br/><small>BIGINT</small></th><th>biggest_order<br/><small>BIGINT</small></th></tr></thead><tbody><tr><td>DMM-01</td><td>delivered</td><td>3</td><td>109</td></tr><tr><td>JED-03</td><td>delivered</td><td>4</td><td>108</td></tr><tr><td>RUH-04</td><td>cancelled</td><td>2</td><td>110</td></tr><tr><td>RUH-04</td><td>delivered</td><td>3</td><td>101</td></tr></tbody></table>
+<table class="dataframe"><thead><tr><th>store_id<br/><small>VARCHAR</small></th><th>status<br/><small>VARCHAR</small></th><th>orders<br/><small>BIGINT</small></th></tr></thead><tbody><tr><td>DMM-01</td><td>delivered</td><td>2</td></tr><tr><td>JED-03</td><td>delivered</td><td>4</td></tr><tr><td>RUH-04</td><td>cancelled</td><td>2</td></tr><tr><td>RUH-04</td><td>delivered</td><td>3</td></tr></tbody></table>
 </div>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-062">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-053">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [30]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [26]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"PIVOT o ON status USING round(sum(amount), 2) GROUP BY store_id ORDER BY store_id"</span><span class="p">)</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SELECT column_name, column_type, min, max, approx_unique, null_percentage FROM (SUMMARIZE o)"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -9550,114 +9103,47 @@ the SQL string: no quoting bugs and no SQL injection.</p>
 </div>
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[30]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[26]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<table class="dataframe"><thead><tr><th>store_id<br/><small>VARCHAR</small></th><th>cancelled<br/><small>DOUBLE</small></th><th>delivered<br/><small>DOUBLE</small></th></tr></thead><tbody><tr><td>DMM-01</td><td>NULL</td><td>114.15</td></tr><tr><td>JED-03</td><td>NULL</td><td>225.05</td></tr><tr><td>RUH-04</td><td>27.5</td><td>342.71</td></tr></tbody></table>
+<table class="dataframe"><thead><tr><th>column_name<br/><small>VARCHAR</small></th><th>column_type<br/><small>VARCHAR</small></th><th>min<br/><small>VARCHAR</small></th><th>max<br/><small>VARCHAR</small></th><th>approx_unique<br/><small>BIGINT</small></th><th>null_percentage<br/><small>DECIMAL(9,2)</small></th></tr></thead><tbody><tr><td>order_id</td><td>BIGINT</td><td>101</td><td>111</td><td>11</td><td>0.00</td></tr><tr><td>store_id</td><td>VARCHAR</td><td>DMM-01</td><td>RUH-04</td><td>3</td><td>0.00</td></tr><tr><td>status</td><td>VARCHAR</td><td>cancelled</td><td>delivered</td><td>2</td><td>0.00</td></tr><tr><td>amount</td><td>DOUBLE</td><td>8.75</td><td>275.86</td><td>11</td><td>0.00</td></tr><tr><td>delivery_fee</td><td>VARCHAR</td><td>0.00</td><td>free</td><td>3</td><td>0.00</td></tr><tr><td>promo_code</td><td>VARCHAR</td><td>YAWM96</td><td>YAWM96</td><td>1</td><td>81.82</td></tr></tbody></table>
 </div>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-063">
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-054">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [31]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SUMMARIZE o"</span><span class="p">)</span><span class="o">.</span><span class="n">df</span><span class="p">()[[</span><span class="s2">"column_name"</span><span class="p">,</span> <span class="s2">"column_type"</span><span class="p">,</span> <span class="s2">"min"</span><span class="p">,</span> <span class="s2">"max"</span><span class="p">,</span> <span class="s2">"approx_unique"</span><span class="p">,</span> <span class="s2">"null_percentage"</span><span class="p">]]</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[31]:</div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<div>
-<style scoped="">
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<table>
 <thead>
-<tr style="text-align: right;">
-<th></th>
-<th>column_name</th>
-<th>column_type</th>
-<th>min</th>
-<th>max</th>
-<th>approx_unique</th>
-<th>null_percentage</th>
+<tr>
+<th>Shortcut</th>
+<th>Does</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<th>0</th>
-<td>order_id</td>
-<td>BIGINT</td>
-<td>101</td>
-<td>112</td>
-<td>12</td>
-<td>0.00</td>
+<td><code>FROM t</code> / <code>FROM t SELECT ...</code></td>
+<td><code>SELECT * FROM t</code> / FROM written first</td>
 </tr>
 <tr>
-<th>1</th>
-<td>store_id</td>
-<td>VARCHAR</td>
-<td>DMM-01</td>
-<td>RUH-04</td>
-<td>3</td>
-<td>0.00</td>
+<td><code>SELECT * EXCLUDE (a)</code></td>
+<td>all columns but some</td>
 </tr>
 <tr>
-<th>2</th>
-<td>status</td>
-<td>VARCHAR</td>
-<td>cancelled</td>
-<td>delivered</td>
-<td>2</td>
-<td>0.00</td>
+<td><code>GROUP BY ALL</code>, <code>ORDER BY ALL</code></td>
+<td>no need to repeat the columns</td>
 </tr>
 <tr>
-<th>3</th>
-<td>amount</td>
-<td>DOUBLE</td>
-<td>8.75</td>
-<td>275.86</td>
-<td>12</td>
-<td>0.00</td>
+<td><code>DESCRIBE</code>, <code>SUMMARIZE</code></td>
+<td>the types / a profile of every column (Lab 1.1)</td>
 </tr>
 <tr>
-<th>4</th>
-<td>delivery_fee</td>
-<td>VARCHAR</td>
-<td>0.00</td>
-<td>free</td>
-<td>3</td>
-<td>0.00</td>
-</tr>
-<tr>
-<th>5</th>
-<td>promo_code</td>
-<td>VARCHAR</td>
-<td>YAWM96</td>
-<td>YAWM96</td>
-<td>1</td>
-<td>83.33</td>
+<td><code>QUALIFY</code></td>
+<td>filter on a window function (<code>00_sql_windows</code>, Lab 1.4)</td>
 </tr>
 </tbody>
 </table>
@@ -9665,209 +9151,13 @@ the SQL string: no quoting bugs and no SQL injection.</p>
 </div>
 </div>
 </div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-064">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-055">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>| Shortcut | Does |
-|---|---|
-| <code>FROM t</code> / <code>FROM t SELECT ...</code> | <code>SELECT * FROM t</code> / FROM written first |
-| <code>SELECT * EXCLUDE (a)</code>, <code>* REPLACE (expr AS a)</code> | all columns but some / with some changed |
-| <code>GROUP BY ALL</code>, <code>ORDER BY ALL</code> | no need to repeat the columns |
-| <code>COLUMNS('regex')</code> | the same expression on every matching column: <code>SELECT max(COLUMNS('amount|fee'))</code> |
-| <code>max_by(x, y)</code>, <code>arg_min</code>, <code>FILTER (WHERE ...)</code> | the <code>x</code> of the largest <code>y</code>; conditional aggregates |
-| <code>PIVOT</code>, <code>UNPIVOT</code> | rows ↔ columns |
-| <code>DESCRIBE</code>, <code>SUMMARIZE</code> | the types / a profile of every column (Lab 1.1) |
-| <code>QUALIFY</code> | filter on a window function (<code>00_sql_windows</code>, Lab 1.4) |</p>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-065">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="8-%C2%B7-Read-the-plan:-EXPLAIN-and-EXPLAIN-ANALYZE-%E2%9E%95">8 · Read the plan: EXPLAIN and EXPLAIN ANALYZE ➕<a class="anchor-link" href="#8-%C2%B7-Read-the-plan:-EXPLAIN-and-EXPLAIN-ANALYZE-%E2%9E%95">¶</a></h2><p>DuckDB turns your SQL into a <strong>plan</strong>, a tree of operators read <strong>from the bottom up</strong>. <code>EXPLAIN</code> shows it without
-running the query. Here is §1's question, asked of a Parquet copy of the big table.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-066">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [32]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="k">with</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/analytics.duckdb"</span><span class="p">,</span> <span class="n">read_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">src</span><span class="p">:</span>
-    <span class="n">src</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"COPY orders TO '</span><span class="si">{</span><span class="n">F</span><span class="si">}</span><span class="s2">/big_orders.parquet' (FORMAT parquet)"</span><span class="p">)</span>
-<span class="n">BIG</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">relpath</span><span class="p">(</span><span class="n">OUT</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s1">'big_orders.parquet'</span><span class="p">))</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span><span class="si">}</span><span class="s2">'"</span>   <span class="c1"># relative: a shorter plan</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"""EXPLAIN SELECT store_id, sum(amount) FROM </span><span class="si">{</span><span class="n">BIG</span><span class="si">}</span>
-<span class="s2">                  WHERE status = 'delivered' GROUP BY ALL"""</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>╭─ Hash Group By ───────────────╮
-│ Groups: #0                    │
-│ Aggregates: sum(#1)           │
-│ ~126,424 rows                 │
-╰───────────────┬───────────────╯
-╭─ Projection ──┴───────────────╮
-│ Projections: store_id, amount │
-│ ~200,000 rows                 │
-╰───────────────┬───────────────╯
-╭─ Parquet Scan ┴───────────────╮
-│ Function: PARQUET_SCAN        │
-│ Projections: store_id, amount │
-│ Filters: status = 'delivered' │
-│ ~200,000 rows                 │
-╰───────────────────────────────╯
-
-</pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-067">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>🔍 The bottom box, the scan of the Parquet file, already knows two things from the query:</p>
-<ul>
-<li><strong>Projections</strong>: only <code>store_id</code> and <code>amount</code> are read; the other columns are never touched.</li>
-<li><strong>Filters</strong>: <code>status='delivered'</code> is applied while reading (a <strong>pushed-down</strong> filter).</li>
-</ul>
-<p>Above it, a <strong>Hash Group By</strong> sums per store. Rows marked <code>~</code> are estimates, made before anything is read.</p>
-<p><code>EXPLAIN ANALYZE</code> <strong>runs</strong> the query and shows each operator's real rows and time.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-068">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [33]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">profile</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"""EXPLAIN ANALYZE SELECT store_id, sum(amount) FROM </span><span class="si">{</span><span class="n">BIG</span><span class="si">}</span>
-<span class="s2">                      WHERE status = 'delivered' GROUP BY ALL"""</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">"Total Time: \S+"</span><span class="p">,</span> <span class="n">profile</span><span class="p">)</span><span class="o">.</span><span class="n">group</span><span class="p">())</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">profile</span><span class="p">[</span><span class="n">profile</span><span class="o">.</span><span class="n">rindex</span><span class="p">(</span><span class="s2">"╭─"</span><span class="p">):])</span>                     <span class="c1"># the last box: the scan</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Total Time: 0.0157s
-╭─ Table Scan ────────┚┖────────────────────╮
-│ Function: PARQUET_SCAN                    │
-│ Projections: store_id, amount             │
-│ Filters: status = 'delivered'             │
-│ Total Files Read: 1                       │
-│ Filename(s):                              │
-│ artifacts/tools_duckdb/big_orders.parquet │
-│ Row Groups Scanned: 9 / 9                 │
-│ 941,176 rows                       70.0ms │
-╰───────────────────────────────────────────╯
-
-</pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-069">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>🔍 The scan produced only the delivered orders: the cancelled ones never left it. When a query is slow, this shows
-<strong>where</strong>: a scan reading too much (Lab 1.2), a join exploding, a sort spilling to disk.</p>
-<p>🤔 <strong>Predict</strong> · DuckDB uses all CPU cores by default. How much slower is the same question on <strong>one</strong> thread?</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-070">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [34]:</div>
-<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="n">question</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"SELECT store_id, sum(amount) FROM </span><span class="si">{</span><span class="n">BIG</span><span class="si">}</span><span class="s2"> WHERE status = 'delivered' GROUP BY ALL"</span>
-<span class="n">cores</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SELECT current_setting('threads')"</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-<span class="n">all_cores</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">best_of</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="n">question</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
-<span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">"SET threads = 1"</span><span class="p">)</span>
-<span class="n">one_core</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">best_of</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="n">question</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
-<span class="n">con</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SET threads = </span><span class="si">{</span><span class="n">cores</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">cores</span><span class="si">}</span><span class="s2"> threads: </span><span class="si">{</span><span class="n">all_cores</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1000</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2"> ms | 1 thread: </span><span class="si">{</span><span class="n">one_core</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1000</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2"> ms | </span><span class="si">{</span><span class="n">one_core</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">all_cores</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">x"</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>8 threads: 16 ms | 1 thread: 53 ms | 3.4x
-</pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-071">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>🔍 Vectorized batches spread over every core: the parallelism a laptop gives for free. Beyond one machine you need
-a cluster (Spark, Day 3).</p>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=duckdb-073">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="9-%C2%B7-Summary">9 · Summary<a class="anchor-link" href="#9-%C2%B7-Summary">¶</a></h2><table>
+<h2 id="7-%C2%B7-Summary">7 · Summary<a class="anchor-link" href="#7-%C2%B7-Summary">¶</a></h2><table>
 <thead>
 <tr>
 <th></th>
@@ -9877,7 +9167,7 @@ a cluster (Spark, Day 3).</p>
 <tbody>
 <tr>
 <td><strong>It does</strong></td>
-<td>SQL analytics on one machine, fast · files in place (CSV, JSON, Parquet, Iceberg) · attach SQLite / PostgreSQL · DataFrames in and out · data larger than memory, by spilling to disk</td>
+<td>SQL analytics on one machine, fast · files in place (CSV, JSON, Parquet, Iceberg) · attach SQLite / PostgreSQL · results into Python · data larger than memory, by spilling to disk</td>
 </tr>
 <tr>
 <td><strong>It doesn't</strong></td>
@@ -9907,14 +9197,6 @@ a cluster (Spark, Day 3).</p>
 <td>in memory / a database file</td>
 </tr>
 <tr>
-<td><code>con.sql("...")</code></td>
-<td>a relation: runs when you ask for rows</td>
-</tr>
-<tr>
-<td><code>.df()</code>, <code>.pl()</code>, <code>.fetchall()</code></td>
-<td>results as pandas, Polars, tuples</td>
-</tr>
-<tr>
 <td><code>FROM 'x.csv'</code>, <code>read_csv(..., types = {...})</code></td>
 <td>a file as a table; take the types into your own hands</td>
 </tr>
@@ -9935,17 +9217,21 @@ a cluster (Spark, Day 3).</p>
 <td>write a file</td>
 </tr>
 <tr>
+<td><code>.fetchall()</code>, <code>.df()</code></td>
+<td>rows as tuples / a table to chart or save</td>
+</tr>
+<tr>
 <td><code>con.execute("... WHERE id = ?", [value])</code></td>
 <td>a parameter from Python</td>
 </tr>
 <tr>
-<td><code>DESCRIBE</code>, <code>SUMMARIZE</code>, <code>EXPLAIN</code>, <code>EXPLAIN ANALYZE</code></td>
-<td>types, profile, plan, plan with timings</td>
+<td><code>DESCRIBE</code>, <code>SUMMARIZE</code></td>
+<td>the types / a profile of every column</td>
 </tr>
 </tbody>
 </table>
 <h2 id="Checkpoint">Checkpoint<a class="anchor-link" href="#Checkpoint">¶</a></h2><ol>
-<li>DuckDB answered faster than both SQLite and pandas, from a smaller file. Why?</li>
+<li>DuckDB answered faster than SQLite, from a smaller file. Why?</li>
 <li>A column you expect to be numeric comes out as <code>VARCHAR</code>. What do you do, and what do you not do?</li>
 <li>Daily files keep arriving: when is a table right, and when a view?</li>
 <li><code>dbt run</code> fails with "could not set lock on file". What is holding it, and what are two ways to avoid it?</li>
@@ -9954,18 +9240,17 @@ a cluster (Spark, Day 3).</p>
 <a href="https://duckdb.org/docs/stable/clients/python/overview">Python API</a> ·
 <a href="https://duckdb.org/docs/stable/data/csv/overview">CSV import</a> ·
 <a href="https://duckdb.org/docs/stable/sql/dialect/friendly_sql">friendly SQL</a> ·
-<a href="https://duckdb.org/docs/stable/connect/concurrency">concurrency</a> ·
-<a href="https://duckdb.org/docs/stable/guides/meta/explain">EXPLAIN</a>.</p>
+<a href="https://duckdb.org/docs/stable/connect/concurrency">concurrency</a>.</p>
 <p><strong>What you built:</strong> the tables and the view in <code>qafila_toy.duckdb</code>.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-074">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=duckdb-056">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [35]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [27]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">with</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">DB</span><span class="p">),</span> <span class="n">read_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">db</span><span class="p">:</span>
