@@ -94,3 +94,7 @@ body.overview{overflow:auto;background:#e5e9e6}body.overview #stage{position:sta
 em.k.bad{color:#a4473b;background:#f6dcd6}.t-row.total{border-top:2px solid #9fb3ad;font-weight:600}
 .tbl em.o,.o-key{font-style:normal;font-weight:600;color:#2f5d8c;background:#dde8f8;border-radius:3px;padding:0 4px;margin:0 -4px}.o-key,.k-key{margin:0}.k-key{font-weight:600;color:#1b6f68;background:#cdeee2;border-radius:3px;padding:0 4px}
 .tbl.prose .t-row>span{font-family:var(--sans)}
+/* Streams into the lakehouse (D3_4): one bar per store, a share out of 100%. */
+.label.bar{display:grid;grid-template-columns:110px 1fr 70px;align-items:center;gap:16px;height:32px;font-weight:400}.bar b{font:600 18px 'Cascadia Code',Consolas,monospace}.bar i{font:600 19px 'Cascadia Code',Consolas,monospace;font-style:normal;text-align:right}
+.bar .track{display:block;height:18px;border-bottom:1px solid #c9d3d6}.bar .track span{display:block;height:100%;background:#9fcbc1;border-radius:0 4px 4px 0}.bar.mine .track span{background:#348f8d}.bar.bad .track span{background:#c46558}.bar.bad b,.bar.bad i{color:#a4473b}
+.label.files{display:flex;gap:2px;height:44px}.files span{flex:none;width:12px;height:44px;border:1.5px solid #8faac6;border-radius:2px;background:#e8f0fc}.files span.k{border-color:#348f8d;background:#348f8d}.files.one span{border-color:#70b5a9;background:#e0f2eb}
