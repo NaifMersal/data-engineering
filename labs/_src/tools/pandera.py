@@ -2,42 +2,39 @@
 # # Pandera, checks at the door
 #
 # Day 2, before Lab 2.4, after `tools/dbt` §9 (dbt tests) · CPU only. A payment provider sends Qafila a day of
-# payments. You check it with a few lines of hand-written asserts, watch what they miss, then write the same rules once
-# as a **Pandera schema**: every problem reported at once, row by row, and the bad rows set aside while the good ones
-# go on.
+# payments. You check it with hand-written asserts, watch what they miss, then write the same rules once as a
+# **Pandera schema**: every problem at once, row by row, and the bad rows set aside while the good ones go on.
 #
-# **The data:** eight invented payments, few enough to check by eye (SAR), with six problems hidden in them. At the end
-# the same schema meets the real payments feed. Lab 2.4 then validates the supplier price files.
+# **The data:** eight invented payments (SAR) with six problems hidden in them, few enough to check by eye. The last
+# section runs the same kind of schema on the real payments feed.
 #
-# **Rhythm:** 🤔 predict → run → 🔍 read.
+# 🤔 asks you to predict before you run a cell · 🔍 says what the output means · ➕ sections are for your own pace.
 #
-# **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
-# then run the cell and the check after it (✅ = right). Answers: `solutions/tools/pandera.ipynb`.
-#
-# **Contents** · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 16'
-# - [ ] 1 · The problem: checks written by hand · 🎯 2'
-# - [ ] 2 · The mental model: a schema, a validation, a report · 🎯 1'
-# - [ ] 3 · Hello world · 🎯 1'
-# - [ ] 4 · Types and nulls, before any rule · 🎯 2'
-# - [ ] 5 · Built-in checks, and every failure at once · 🎯 3', Ex. 1 filled in together
-# - [ ] 6 · Your own checks: one column, or the whole row · 🎯 2', Ex. 2 filled in together
-# - [ ] 7 · Quarantine: good rows on, bad rows aside · 🎯 2', Ex. 3 filled in together
-# - [ ] 8 · Pandera and dbt tests: where each rule belongs · 🎯 2'
-# - [ ] 9 · The real feed · ➕
-# - [ ] 10 · Back to the map · 🎯 1'
+# **Contents**
+# - [ ] 1 · The problem: checks written by hand
+# - [ ] 2 · The mental model: a schema, a validation, a report
+# - [ ] 3 · A first schema
+# - [ ] 4 · Types and nulls, before any rule
+# - [ ] 5 · Built-in checks, and every failure at once
+# - [ ] 6 · Your own checks: one column, or the whole row
+# - [ ] 7 · Quarantine: good rows on, bad rows aside
+# - [ ] 8 · Pandera and dbt tests: where each rule belongs
+# - [ ] 9 · The real feed ➕
+# - [ ] 10 · Summary
 
 # %% [markdown] 🎓
-# 🎓 **Instructor notes** (solution notebook only)
+# 🎓 **Instructor notes** (instructor copy only)
 #
-# - D2_4 opens with `tools/dbt` §9 (10'), then this walkthrough: core ≈ 16' (🎯 in the contents); §9 is ➕. §8 links
-#   the two halves of the session: the same rules, at the door (Pandera) and in the warehouse (dbt).
-# - Fill in the three exercises together (the room calls out the blanks): each builds what the next section uses
-#   (`Payment`, `failures2`, `clean`).
+# - D2_4 opens with `tools/dbt` §9 (10'), then this walkthrough. Core ≈ 16': §1 2' · §2 1' · §3 1' · §4 2' · §5 3' ·
+#   §6 2' · §7 2' · §8 2' · §10 1'. §9 is ➕. §8 links the two halves of the session: the same rules, at the door
+#   (Pandera) and in the warehouse (dbt).
+# - §5 to §7 each build what the next one uses (`Payment`, `failures2`, `clean`): run them in order.
 # - In class, run the cells of a ➕ section without stopping on them: later cells may use what they build.
 # - Lab 2.4 task 5 asks for the `SupplierPrice` model and gives the quarantine code: here the same mechanism runs on
 #   payments, so don't write the supplier schema in class.
 # - Expect "why not Great Expectations / Soda?": same job (declared expectations, a report). Pandera is a library that
 #   lives in the pipeline's Python, next to the DataFrame; the others add their own config, stores and reports.
+#   Pydantic checks one record at a time (an API payload), not a DataFrame.
 
 # %%
 import os, sys, subprocess
@@ -72,15 +69,16 @@ OUT = U.lab_dir("tools_pandera", reset=True)
 print("Output folder:", OUT)
 
 # %% [markdown]
-# You are here: Pandera **tests**. It checks a DataFrame against declared rules, in Python, usually at the door: before
-# a file or an API batch is loaded into the warehouse.
+# Pandera **tests**, like dbt, but earlier: it checks a DataFrame against declared rules, in Python, before a file or
+# an API batch is loaded into the warehouse.
 
 # %%
 V.platform_map(tool="pandera")
 
 # %% [markdown]
-# Monday's export from the payment provider. A payment is `captured` (money taken), `refunded` (given back) or
-# `failed`. Six things are wrong in these eight rows; try to spot some before the checks do.
+# Monday's export from the payment provider, which Finance reconciles against the orders. A payment is `captured`
+# (money taken), `refunded` (given back) or `failed`. Six things are wrong in these eight rows: try to spot some before
+# the checks do.
 
 
 # %%
@@ -120,10 +118,10 @@ except AssertionError as e:
     print("❌", e)
 
 # %% [markdown]
-# 🔍 It stopped at the first problem. Which payment? How many other problems are there? Nobody knows until we fix this
-# one and run again. Say someone removes the duplicate and the negative amount:
+# 🔍 It stops at the first problem, without saying which payment, or how many other problems there are.
 #
-# 🤔 **Predict** · What does the check say about the six rows that are left?
+# 🤔 **Predict** · Someone removes the duplicate and the negative amount. What does the check say about the six rows
+# that are left?
 
 # %%
 fixed = PAYMENTS.unique("payment_id", keep="first", maintain_order=True).filter(pl.col("amount") != -5.00)
@@ -135,17 +133,7 @@ print("is (null > 0) true for every row?", (pl.Series([12.0, None]) > 0).all())
 
 # %% [markdown]
 # 🔍 It complains about the method, fine. But payment 9007 has **no amount**, and the amount check passed it:
-# `(amount > 0).all()` skips nulls. And the refund recorded **before** the capture (9002)? No check even looks.
-#
-# | Job | Asserts by hand | Pandera |
-# |---|---|---|
-# | Report every problem, not the first | one per run | `lazy=True`: all failures at once (§5) |
-# | Say which rows | nothing | `failure_cases`: the value, the check and the row (§5) |
-# | Nulls | slip through `.all()` | columns are **not nullable** unless you say so (§4) |
-# | Types | not checked | each column's type is checked first, or converted on request (§4) |
-# | Rules across columns | more code | `@pa.dataframe_check` (§6) |
-# | Keep the good rows, set the bad aside | more code | row numbers in the report (§7) |
-# | The same rules wherever the data is read | copy-paste | one schema class, reused (§3, §8) |
+# `(amount > 0).all()` skips nulls. And the refund recorded **before** its capture (9002)? No check even looks.
 
 # %% [markdown]
 # ## 2 · The mental model: a schema, a validation, a report
@@ -157,18 +145,10 @@ print("is (null > 0) true for every row?", (pl.Series([12.0, None]) > 0).all())
 #   frame:  checks across columns     3. the frame's checks                SchemaErrors + report  (lazy=True: all)
 # ```
 #
-# | You declare | Pandera does |
-# |---|---|
-# | a column and its Python type: `amount: float` | checks the column exists and is `Float64` |
-# | `nullable=True` (or not) | rejects nulls unless allowed |
-# | `pa.Field(gt=0, isin=[...], unique=True, ...)` | runs those checks on every value |
-# | `@pa.check`, `@pa.dataframe_check` | runs your own rule on a column, or across columns |
-# | `class Config: coerce, strict` | converts types first / rejects columns you didn't declare |
-#
 # Validation doesn't change the data. It either hands it back or raises, with a report of what failed.
 
 # %% [markdown]
-# ## 3 · Hello world
+# ## 3 · A first schema
 #
 # A schema is a class: one attribute per column, its type, and its checks.
 
@@ -182,7 +162,7 @@ good = PAYMENTS.head(3).select("payment_id", "amount")
 Hello.validate(good)
 
 # %% [markdown]
-# 🔍 Valid: `validate` returns the DataFrame, so it fits in a chain (`Hello.validate(df).write_parquet(...)`).
+# 🔍 `validate` returns the DataFrame, so it fits in a chain: `Hello.validate(df).write_parquet(...)`.
 #
 # 🤔 **Predict** · And the full export, with its negative and missing amounts?
 
@@ -193,14 +173,13 @@ except pa.errors.SchemaError as e:
     print("❌", type(e).__name__, "·", str(e).splitlines()[0])
 
 # %% [markdown]
-# 🔍 It found the `null` first: before any rule, a column is checked for type and nulls (§4). One error at a time is
-# still the asserts' behaviour; §5 asks for all of them.
+# 🔍 It reports the `null` and stops: one error at a time, like the asserts. §5 asks for all of them.
 
 # %% [markdown]
 # ## 4 · Types and nulls, before any rule
 #
-# Every column is checked in this order: is it there, is its **type** right, are there **nulls**, then its checks.
-# Files often arrive as text. Here is the export read from a CSV with every column as a string:
+# Each column is checked in this order: is it there, is its **type** right, are there **nulls**, then its checks.
+# Files often arrive as text: here is the export read from a CSV, every column a string.
 
 # %%
 PAYMENTS.write_csv(OUT / "payments_2026-09-14.csv")
@@ -212,8 +191,8 @@ except pa.errors.SchemaError as e:
     print("❌", str(e).splitlines()[0])
 
 # %% [markdown]
-# 🔍 Pandera doesn't guess: a `String` column is not an `int` column. Two choices: parse the file yourself (Lab 2.4
-# does, because its supplier writes `9,49`), or ask Pandera to **coerce** each column to the declared type.
+# 🔍 Pandera doesn't guess: a `String` column is not an `int` column. Either parse the file yourself (Lab 2.4 must,
+# because its supplier writes `9,49`), or ask Pandera to **coerce** each column to the declared type.
 
 # %%
 class HelloCoerced(pa.DataFrameModel):
@@ -236,46 +215,17 @@ except pa.errors.SchemaError as e:
     print("❌", str(e).splitlines()[0])
 
 # %% [markdown]
-# 🔍 The null is now allowed, so the next problem shows: `-5.0` breaks `gt=0`. Note the default: **a column may not
-# be null unless you say `nullable=True`**. dbt is the other way round: a column may be null until you add a
-# `not_null` test. Pandera's default is the one that would have caught 9007.
+# 🔍 The null is allowed now, so the next problem shows: `-5.0` breaks `gt=0`. Without `nullable=True`, a null fails.
+# dbt is the other way round: a column may be null until you add a `not_null` test. Pandera's default is the one that
+# would have caught 9007.
 
 # %% [markdown]
 # ## 5 · Built-in checks, and every failure at once
 #
-# | Check | Fails when |
-# |---|---|
-# | `gt`, `ge`, `lt`, `le`, `in_range` | a value is outside the bounds |
-# | `isin`, `notin` | a value is not in (or is in) a list |
-# | `str_startswith`, `str_matches`, `str_length` | a string has the wrong shape |
-# | `unique=True` | a value appears more than once |
-# | `nullable=True` | (allows nulls; the default rejects them) |
-#
-# `validate(df, lazy=True)` runs **every** check and raises `SchemaErrors` (plural) with a table of failures.
-#
-# ✏️ **Exercise 1** (🎯 together in class) · Write the schema `Payment`: `payment_id` (int) unique; `order_id` (int);
-# `amount` (float) greater than 0; `method` (str) one of `card`, `wallet`, `cash`; `status` (str) one of `captured`,
-# `refunded`, `failed`. Then validate `PAYMENTS` with `lazy=True` and store the failure table (`e.failure_cases`) in
-# `failures`.
-# - **Check yourself:** six failures: two for the duplicate 9003, one each for the negative, the null, `cheque` and
-#   `Card`.
+# Finance wants every problem in one report, to send back to the provider. `validate(df, lazy=True)` runs **every**
+# check and raises `SchemaErrors` (plural) with a table of failures. Here is the full schema, `Payment`:
 
 # %%
-# Template:
-# class Payment(pa.DataFrameModel):
-#     payment_id: int = pa.Field(___=True)
-#     order_id: int
-#     amount: float = pa.Field(___=0)
-#     method: str = pa.Field(isin=[___])
-#     status: str = pa.Field(isin=[___])
-#
-#
-# failures = None
-# try:
-#     Payment.validate(PAYMENTS, lazy=___)
-# except pa.errors.SchemaErrors as e:
-#     failures = e.failure_cases
-# BEGIN SOLUTION
 class Payment(pa.DataFrameModel):
     payment_id: int = pa.Field(unique=True)
     order_id: int
@@ -289,18 +239,20 @@ try:
     Payment.validate(PAYMENTS, lazy=True)
 except pa.errors.SchemaErrors as e:
     failures = e.failure_cases
-# END SOLUTION
 failures
 
-# %%
-U.check(failures is not None and failures.height == 6, "six failures")
-U.check(sorted(failures["index"].to_list()) == [2, 3, 4, 5, 6, 7], "rows 2 to 7 each fail once (rows count from 0)")
-U.check(set(failures["column"]) == {"payment_id", "amount", "method"}, "in payment_id, amount and method")
-
 # %% [markdown]
-# 🔍 One row per failure: the bad value (`failure_case`), the `column`, the `check`, and the row number (`index`, from
-# 0). That's a report you can send back to the provider. Still missing: the refund before its capture (9002), because
-# no check compares two columns yet (§6).
+# | Check | Fails when |
+# |---|---|
+# | `gt`, `ge`, `lt`, `le`, `in_range` | a value is outside the bounds |
+# | `isin`, `notin` | a value is not in (or is in) a list |
+# | `str_startswith`, `str_matches`, `str_length` | a string has the wrong shape |
+# | `unique=True` | a value appears more than once |
+# | `nullable=True` | (allows nulls; the default rejects them) |
+#
+# 🔍 Six failures: both copies of 9003, the negative, the null, `cheque` and `Card`, each with its row number (`index`,
+# from 0). A report you can send back to the provider. Still missing: the refund before its capture (9002), because no
+# check compares two columns yet.
 #
 # **Break it on purpose.** Pipelines often work on a `LazyFrame` (Polars' plan, not yet run). `lazy=True` above is a
 # Pandera option; a `LazyFrame` is something else.
@@ -312,9 +264,8 @@ checked = Payment.validate(PAYMENTS.lazy())
 print(type(checked).__name__, "· no error raised")
 
 # %% [markdown]
-# 🔍 No error. On a `LazyFrame`, Pandera only checks what it can without running the plan: the columns and their
-# types. The **values** are never looked at, because that would mean collecting the data. Validate a `DataFrame` (call
-# `.collect()` first), or set the environment variable `PANDERA_VALIDATION_DEPTH=SCHEMA_AND_DATA` to force data checks.
+# 🔍 No error. On a `LazyFrame`, Pandera checks only what it can without running the plan: the columns and their
+# types. The **values** are never looked at. To check them, validate a `DataFrame`: call `.collect()` first.
 
 # %%
 try:
@@ -329,13 +280,13 @@ except pa.errors.SchemaError as e:
 # %% [markdown]
 # ## 6 · Your own checks: one column, or the whole row
 #
-# Some rules aren't in the list. A **column check** receives the column and returns one `True`/`False` per row. In
-# Polars it gets a `PolarsData` (`data.lazyframe` and the column name `data.key`) and returns a LazyFrame of booleans.
+# Some rules aren't built in: an amount must be a whole number of halalas. A **column check** receives the column and
+# returns one `True`/`False` per row.
 
 # %%
 class PaymentChecked(Payment):                           # every rule of Payment, plus one
     @pa.check("amount", name="at_most_two_decimals")
-    def whole_halalas(cls, data: PolarsData) -> pl.LazyFrame:
+    def whole_halalas(cls, data: PolarsData) -> pl.LazyFrame:   # data.lazyframe: the rows · data.key: the column
         return data.lazyframe.select(((pl.col(data.key) * 100).round(0) - pl.col(data.key) * 100).abs() < 1e-6)
 
 
@@ -345,31 +296,11 @@ except pa.errors.SchemaErrors as e:
     display(e.failure_cases.select("failure_case", "check", "index"))
 
 # %% [markdown]
-# 🔍 Subclassing `Payment` kept its rules (the six failures of §5) and added one: 275.855 isn't a sum in halalas. A **dataframe check** sees whole rows, so it can compare
-# columns: that's the refund before its capture.
+# 🔍 The subclass kept `Payment`'s rules (its six failures) and added one: 275.855.
 #
-# ✏️ **Exercise 2** (🎯 together in class) · Write `PaymentWithRefunds`, a subclass of `Payment` with `refunded_at`
-# nullable, and a `@pa.dataframe_check` named `refund_after_capture`: a row passes if `refunded_at` is null **or** later
-# than `captured_at`. Validate `PAYMENTS` lazily and store the failures in `failures2`.
-# - **Check yourself:** seven failures now; the new one is row 1 (payment 9002).
+# A **dataframe check** sees whole rows, so it can compare columns: a refund must come after its capture.
 
 # %%
-# Template:
-# class PaymentWithRefunds(Payment):
-#     captured_at: datetime
-#     refunded_at: datetime = pa.Field(nullable=___)
-#
-#     @pa.dataframe_check(name="refund_after_capture")
-#     def refund_after_capture(cls, data: PolarsData) -> pl.LazyFrame:
-#         return data.lazyframe.select(pl.col("refunded_at").___() | (pl.col("refunded_at") > pl.col("___")))
-#
-#
-# failures2 = None
-# try:
-#     PaymentWithRefunds.validate(PAYMENTS, lazy=True)
-# except pa.errors.SchemaErrors as e:
-#     failures2 = e.failure_cases
-# BEGIN SOLUTION
 class PaymentWithRefunds(Payment):
     captured_at: datetime
     refunded_at: datetime = pa.Field(nullable=True)
@@ -384,17 +315,11 @@ try:
     PaymentWithRefunds.validate(PAYMENTS, lazy=True)
 except pa.errors.SchemaErrors as e:
     failures2 = e.failure_cases
-# END SOLUTION
 failures2.select("check", "column", "index")
 
-# %%
-U.check(failures2 is not None and failures2.height == 7, "seven failures")
-U.check(failures2.filter(pl.col("check") == "refund_after_capture")["index"].to_list() == [1],
-        "the refund before its capture is row 1 (payment 9002)")
-
 # %% [markdown]
-# 🔍 All six problems found, in one run, with their rows. The schema is also documentation: print it and you see every
-# rule the data must meet.
+# 🔍 The new failure is row 1, payment 9002: all six problems, found in one run, with their rows. Printed, the schema
+# documents every rule the data must meet.
 
 # %%
 print(PaymentWithRefunds.to_schema())
@@ -402,28 +327,15 @@ print(PaymentWithRefunds.to_schema())
 # %% [markdown]
 # ## 7 · Quarantine: good rows on, bad rows aside
 #
-# Rejecting the whole file for one bad row stops the business; loading it all lets the bad rows in. The usual middle
-# way: **quarantine**. Valid rows go on, invalid rows go to a separate place with the reason, and someone (the
-# provider, the data owner) is told.
-#
-# The failure table has the row numbers. Number the rows the same way, then split.
-#
-# ✏️ **Exercise 3** (🎯 together in class) · Build `reasons` (one row per bad `index`, its checks joined with `"; "` into
-# `reason`), then `quarantine` (the bad rows with their `reason`, an inner join) and `clean` (the other rows, an anti
-# join, without `index`).
-# - **Check yourself:** one clean row (9001), seven quarantined.
+# Rejecting the whole file for one bad row leaves Finance with no payments to reconcile; loading it all lets the bad
+# rows in. The middle way is **quarantine**: valid rows go on, invalid rows go aside with the reason, and someone (the
+# provider, the data owner) is told. Number the rows as the failure table does, then split.
 
 # %%
 numbered = PAYMENTS.with_row_index("index").with_columns(pl.col("index").cast(pl.Int32))
-# Template:
-# reasons = failures2.group_by("index").agg(pl.col("check").str.join("; ").alias("reason"))
-# quarantine = numbered.join(reasons, on="___", how="___")
-# clean = numbered.join(reasons, on="___", how="___").drop("index")
-# BEGIN SOLUTION
-reasons = failures2.group_by("index").agg(pl.col("check").str.join("; ").alias("reason"))
-quarantine = numbered.join(reasons, on="index", how="inner")
-clean = numbered.join(reasons, on="index", how="anti").drop("index")
-# END SOLUTION
+reasons = failures2.group_by("index").agg(pl.col("check").str.join("; ").alias("reason"))   # one row per bad row
+quarantine = numbered.join(reasons, on="index", how="inner")                # the bad rows, with their reason
+clean = numbered.join(reasons, on="index", how="anti").drop("index")        # every other row
 quarantine.select("index", "payment_id", "amount", "method", "reason").sort("index")
 
 # %%
@@ -435,8 +347,8 @@ print("written:", sorted(p.name for p in OUT.iterdir()))
 
 # %% [markdown]
 # 🔍 Both copies of 9003 went to quarantine: `unique` flags every copy, because Pandera can't know which one is right.
-# If "keep the first" is the rule, deduplicate **before** validating and say so in the code (Lab 2.1 does this for
-# the courier events). Lab 2.4 runs this same split on the supplier price files.
+# If "keep the first" is the rule, deduplicate **before** validating and say so in the code. Lab 2.4 runs this same
+# split on the supplier price files.
 
 # %% [markdown] 🎓
 # 🎓 Ask: "who reads `payments_quarantine.csv`?" If nobody owns it, quarantine is a slow way to lose data. Day 4's
@@ -445,7 +357,7 @@ print("written:", sorted(p.name for p in OUT.iterdir()))
 # %% [markdown]
 # ## 8 · Pandera and dbt tests: where each rule belongs
 #
-# Lab 2.3's dbt project tests its models too. The same rules, written both ways:
+# The dbt tests you just met check the same kinds of rules, written another way:
 #
 # | Rule | Pandera (Python, on a DataFrame) | dbt (SQL, on a warehouse table) |
 # |---|---|---|
@@ -468,8 +380,8 @@ print("written:", sorted(p.name for p in OUT.iterdir()))
 # Neither replaces the other. Check what arrives at the door, test what you build inside, and write down with the
 # producer what they promise to send (a **data contract**, Lab 4.2).
 #
-# Pandera can also guard a function's inputs and outputs. `@pa.check_types` validates every argument and return value
-# annotated with a schema:
+# Inside the pipeline, Pandera can also guard a function: `@pa.check_types` validates every argument and return value
+# annotated with a schema, so unchecked data can't get in.
 
 # %%
 from pandera.typing.polars import DataFrame
@@ -487,14 +399,10 @@ except pa.errors.SchemaError as e:
     print("❌ the raw export:", str(e).splitlines()[0])
 
 # %% [markdown]
-# 🔍 The function can't be called with unchecked data. Dagster (Lab 4.1) does the same at the boundary between two
-# assets.
-
-# %% [markdown]
 # ## 9 · The real feed ➕
 #
 # The real payment provider's feed has more methods (`apple_pay`), ids like `pay_9000464`, and a field added halfway
-# through (`wallet_provider`, the change dlt evolved in `tools/dlt`). A schema for it, built from `Payment`:
+# through (`wallet_provider`). A schema for it, on the model of `Payment`:
 
 # %%
 feed = pl.read_ndjson(U.ensure_data() / "api" / "payments.jsonl", infer_schema_length=None)
@@ -525,7 +433,7 @@ except pa.errors.SchemaErrors as e:
 # %% [markdown]
 # 🔍 Two kinds of failure, and they need different answers:
 # - a few **non-positive amounts**: real errors (or reversals sent as negatives); quarantine them and ask the provider;
-# - thousands of **wallet payments without a provider**: not bad rows, a rule that is wrong for the old data, sent
+# - thousands of **wallet payments without a provider**: not bad rows, but a rule that is wrong for the old data, sent
 #   before the field existed. The rule should say "from the day the field appeared", or be a `warn` for now.
 #
 # A check that fails on thousands of rows on its first run is usually telling you about the rule, not the data.
@@ -538,26 +446,20 @@ print("wallet payments sent since then without one:",
                   & (pl.col("updated_at") >= since)).height)
 
 # %% [markdown]
-# 🔍 None. The rule holds for every record **sent** (`updated_at`) since 15 September. Judged by `created_at` it goes
-# wrong: the first provider then shows up on 10 September (a payment refunded after the 15th, so sent again with the
-# new field), and hundreds of wallet payments created after it have none. Which timestamp a rule uses is part of the
+# 🔍 None: the rule holds for every record **sent** (`updated_at`) since 15 September. Judged by `created_at` it goes
+# wrong: a payment refunded after the 15th was sent again with the new field, so the first provider shows up on 10
+# September, and hundreds of wallet payments created after it have none. Which timestamp a rule uses is part of the
 # rule.
 
 # %% [markdown]
-# ## 10 · Back to the map
+# ## 10 · Summary
 #
-# Pandera **tests** data at the door, in Python, before it reaches the warehouse.
-
-# %%
-V.platform_map(tool="pandera")
-
-# %% [markdown]
 # | | |
 # |---|---|
 # | **It does** | types and nulls · built-in and custom checks, per column or per row · every failure at once, with row numbers · `@check_types` on functions · pandas, Polars and PySpark DataFrames |
 # | **It doesn't** | test the tables you build in the warehouse (dbt tests, Lab 2.4) · watch data over time: freshness, volume, drift (observability, Lab 4.2) · agree the rules with the producer (data contracts, Lab 4.2) |
-# | **Neighbours** | Great Expectations, Soda (expectations with their own config and reports) · Pydantic (one record at a time, e.g. an API payload) · dbt tests, SQLMesh audits |
-# | **Managed equivalents** | Databricks expectations (DLT), Snowflake data metric functions, Monte Carlo, Bigeye |
+# | **In this course** | Lab 2.4 validates the supplier price files and quarantines the bad rows · it can run inside a Dagster asset, before the data is written |
+# | **As a service** | Pandera is a library, not a service. The same job, managed: Databricks expectations (DLT), Snowflake data metric functions, Monte Carlo, Bigeye |
 #
 # **Cheat sheet**
 #
@@ -567,20 +469,22 @@ V.platform_map(tool="pandera")
 # | `S.validate(df)` / `S.validate(df, lazy=True)` | first failure (`SchemaError`) / all failures (`SchemaErrors`) |
 # | `e.failure_cases` | the report: value, column, check, row `index` |
 # | `pa.Field(nullable=True, unique=True, isin=[...])` | allow nulls, no repeats, a list of values |
+# | `gt`, `ge`, `lt`, `le`, `in_range` · `notin` · `str_startswith`, `str_matches`, `str_length` | more built-in checks: bounds, excluded values, string shape |
 # | `class Config: coerce = True; strict = True` | convert to the declared types / no undeclared columns |
 # | `@pa.check("col")`, `@pa.dataframe_check` | your own rule on a column / across columns |
 # | `class B(A): ...` | a schema with all of A's rules, plus more |
+# | `S.to_schema()` | every rule, printed |
+# | `failures.group_by("index")`, then join on a row index `how="inner"` / `how="anti"` | quarantine / clean rows |
 # | `@pa.check_types` + `DataFrame[S]` | validate a function's inputs and outputs |
-# | `S.validate(lazy_frame)` | ⚠️ types only; `.collect()` first to check values |
+# | `S.validate(lazy_frame)` | ⚠️ types only; `.collect()` first to check values (or set `PANDERA_VALIDATION_DEPTH=SCHEMA_AND_DATA`) |
 #
 # ## Checkpoint
 #
 # 1. The asserts in §1 passed a payment with no amount. Why, and which Pandera default catches it?
 # 2. `lazy=True` and a `LazyFrame`: what does each do to a validation?
 # 3. Both copies of 9003 were quarantined. When is that right, and what would you do instead?
-# 4. A supplier file fails one check on 3 rows. Reject the file, quarantine the rows, or load it all and warn? Who
-#    decides?
-# 5. The wallet check failed on thousands of real rows. What was wrong: the data or the rule?
+# 4. One check fails on 3 rows of a file; another fails on thousands. Reject the file, quarantine the rows, or load it
+#    all and warn? Is the data wrong, or the rule? Who decides?
 #
 # Next: [Lab 2.4 · Make it trustworthy](../D2_4_data_quality.ipynb). Docs:
 # [Polars integration](https://pandera.readthedocs.io/en/stable/polars.html) ·
@@ -588,9 +492,7 @@ V.platform_map(tool="pandera")
 # [checks](https://pandera.readthedocs.io/en/stable/checks.html) ·
 # [lazy validation](https://pandera.readthedocs.io/en/stable/lazy_validation.html).
 #
-# ## 🖼️ Visual summary
-#
-# **What the schema did to Monday's export:** every row, its checks, and where it went.
+# **What you built:** Monday's export, split by the schema into quarantine and clean.
 
 # %%
 V.table_steps([

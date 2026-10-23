@@ -1,35 +1,34 @@
 # %% [markdown]
 # # dlt, from a hand-written loader to an incremental pipeline
 #
-# Day 1, before Lab 1.3 · CPU only. You load a handful of payments by hand, watch the loader go wrong in four ways,
-# then let dlt do the same job and read every file and table it produces, so nothing in Lab 1.3 is magic.
+# Day 1, before Lab 1.3 · CPU only. Finance needs Qafila's payments in the warehouse every day, refunds included. You
+# load them with a short script, watch it go wrong in four ways, then let dlt do the same job and read every file and
+# table it produces, so nothing in Lab 1.3 is magic.
 #
-# **The data:** a payment provider that sends Qafila its payments, day by day. The rows are invented and few enough
-# to check by eye (SAR). Lab 1.3 then does the same with the real provider API and the app database.
+# **The data:** a few invented payments (SAR), sent by a payment provider day by day, small enough to check by eye.
+# Lab 1.3 does the same with the real provider API and the app database.
 #
-# **Rhythm:** 🤔 predict → run → 🔍 read.
+# 🤔 asks you to predict before you run a cell · 🔍 says what the output means · ➕ sections are for your own pace.
 #
-# **Exercises (✏️):** uncomment the template (`Ctrl+/`), replace every `___`, delete the two `YOUR CODE HERE` lines,
-# then run the cell and the check after it (✅ = right). Answers: `solutions/tools/dlt.ipynb`.
-#
-# **Contents** · 🎯 walked in class (minutes) · ➕ at your own pace, like the ✏️ exercises not done in class · core ≈ 25'
-# - [ ] 1 · The problem: a loader written by hand · 🎯 4'
-# - [ ] 2 · The mental model: a resource, three steps, a load package · 🎯 2'
-# - [ ] 3 · Hello world, and the three steps one at a time · 🎯 5'
-# - [ ] 4 · Write dispositions: append, replace, merge · 🎯 4'
-# - [ ] 5 · Incremental loading: a cursor kept in state · 🎯 5'
-# - [ ] 6 · Break it on purpose: a late record slips past the cursor · ➕
-# - [ ] 7 · Schemas: inferred, evolved, nested, and frozen by a contract · 🎯 3' evolution · ➕ nested, variant, contracts
-# - [ ] 8 · From Python lists to a real API · ➕ (Lab 1.3 does it on the payments API)
-# - [ ] 9 · Back to the map · 🎯 2'
+# **Contents**
+# - [ ] 1 · The problem: a loader written by hand
+# - [ ] 2 · The mental model: a resource, three steps, a load package
+# - [ ] 3 · Hello world, and the three steps one at a time
+# - [ ] 4 · Write dispositions: append, replace, merge
+# - [ ] 5 · Incremental loading: a cursor kept in state
+# - [ ] 6 · Break it on purpose: a late record slips past the cursor ➕
+# - [ ] 7 · Schemas: inferred, evolved, nested, and frozen by a contract
+# - [ ] 8 · From Python lists to a real API ➕
+# - [ ] 9 · Summary
 
 # %% [markdown] 🎓
-# 🎓 **Instructor notes** (solution notebook only)
+# 🎓 **Instructor notes** (instructor copy only)
 #
 # - Run the setup cell before class (Colab installs dlt in about a minute).
-# - Core ≈ 25' (🎯 in the contents; estimated, not taught yet): sections 1–5, schema evolution in 7, and 9. §6 and
-#   §8 are ➕. Sections 1–5 carry the session: the pain, the three steps, dispositions, the cursor in state.
-# - In class, run the cells of a ➕ section without stopping on them: later cells may use what they build.
+# - Core ≈ 25' (estimated, not taught yet): §1 4' · §2 2' · §3 5' · §4 4' · §5 5' · §7 3' (evolution; nested,
+#   variant and contracts ➕) · §9 2'. §6 and §8 are ➕. Sections 1–5 carry the session: the pain, the three steps,
+#   dispositions, the cursor in state.
+# - In class, run the cells of a ➕ part without stopping on them: later cells may use what they build.
 #   Lab 1.3 repeats each of them on the real API, so don't solve the lab's exercises here.
 # - Ask every 🤔 question out loud and wait for two or three answers before running the cell.
 # - Expect "why not Airbyte / Fivetran?": same jobs (pagination, state, schema, load log), as a hosted service with
@@ -77,16 +76,16 @@ def sql(query):
         return connection.sql(query).df()
 
 # %% [markdown]
-# You are here: dlt **ingests**. It reads from the sources on the left and lands their data, as sent, in the
-# **bronze** zone: a `raw` schema in DuckDB.
+# dlt **ingests**: it reads from the sources on the left and lands their data, as sent, in the **bronze** zone, a
+# `raw` schema in DuckDB.
 
 # %%
 V.platform_map(tool="dlt")
 
 # %% [markdown]
 # The provider's feed. Each record is one version of a payment: when a payment changes (a refund), the provider sends
-# it again with a later `updated_at`. `provider(day, since)` returns what an export on that `day` contains: the
-# latest version of every payment, optionally only those changed `since` a time.
+# it again with a later `updated_at`. `provider(day, since)` returns that day's export: the latest version of every
+# payment, or only those changed `since` a time.
 
 # %%
 FEED = [
@@ -155,9 +154,10 @@ load_by_hand(provider(MON))
 by_hand.sql("SELECT count(*) AS rows, sum(amount) AS revenue FROM payments").df()
 
 # %% [markdown]
-# 🔍 Six rows and twice the revenue. The load is not **idempotent**: running it twice is not the same as running it once.
+# 🔍 Six rows and twice the revenue. The load is not **idempotent**: running it twice is not the same as running it
+# once.
 #
-# Start again, and on Tuesday load only what changed since the last load: the **cursor** is the highest `updated_at`
+# Start again, and on Tuesday load only what changed since the last load. The **cursor** is the highest `updated_at`
 # we have.
 #
 # 🤔 **Predict** · Tuesday's export holds the refund of payment 9003. How many rows does 9003 have after the load?
@@ -171,10 +171,10 @@ load_by_hand(provider(TUE, since=cursor))
 by_hand.sql("SELECT payment_id, status, updated_at FROM payments WHERE payment_id = 9003").df()
 
 # %% [markdown]
-# 🔍 Two rows for one payment: a refund arrives as a new version, and `INSERT` appends it. Revenue now counts 9003 as
-# captured **and** refunded. We'd need an upsert on `payment_id`.
+# 🔍 Two rows for one payment: the refund arrives as a new version, and `INSERT` appends it. Finance's revenue now
+# counts 9003 as captured **and** refunded. We'd need an upsert on `payment_id`.
 #
-# 🤔 **Predict** · Wednesday the provider adds a field, `wallet_provider`. What does the loader do?
+# 🤔 **Predict** · On Wednesday the provider adds a field, `wallet_provider`. What does the loader do?
 
 # %%
 cursor = by_hand.sql("SELECT max(updated_at) FROM payments").fetchall()[0][0]
@@ -184,33 +184,24 @@ except duckdb.Error as e:
     print("❌", str(e).splitlines()[0])
 
 # %% [markdown]
-# 🔍 The loader stops, and the night's data never arrives. If it had picked known keys instead, it would have dropped
-# the new field without a word.
+# 🔍 The loader stops, and the night's data never arrives. Had it picked known keys instead, it would have dropped the
+# new field without a word.
 #
-# One more problem hides in the cursor. Here we read it back from the table, which is fine for one table. Most
-# scripts keep it in a file. Save it **before** the insert and a crash in between loses data. Save it **after**, and a
-# crash in between loads the same rows twice.
-#
-# | Job | The script | dlt |
-# |---|---|---|
-# | Retry safely | duplicates | write dispositions, `merge` on a key (§4) |
-# | Changes since last time | a cursor in a file | an incremental cursor, saved **with** the data (§5) |
-# | New or changed fields | crash, or silent drop | schema inference and evolution, contracts if you want strict (§7) |
-# | Paging, 429s, retries | more code | `RESTClient` (§8) |
-# | "Which load wrote this row?" | nothing | a load id on every row, a log of every load (§3) |
+# One more problem hides in the cursor. Most scripts keep it in a file. Save it **before** the insert and a crash in
+# between loses data. Save it **after**, and a crash in between loads the same rows twice.
 
 # %% [markdown] 🎓
-# 🎓 Let the room list the problems before you show the table. Someone usually suggests "DELETE then INSERT": that's
-# `replace`, fine for small tables and wrong for a growing one (§4).
+# 🎓 Let the room list the four problems (duplicates on retry, versions appended, a crash on a new field, the cursor
+# out of step with the data). Someone usually suggests "DELETE then INSERT": that's `replace`, fine for small tables
+# and wrong for a growing one (§4).
 
 # %% [markdown]
 # ## 2 · The mental model: a resource, three steps, a load package
 #
 # ```
-#   resource            extract              normalize                  load
-#   (Python, yields ──► rows as files ──────► schema inferred, ─────────► tables created or altered,
-#    rows or pages)     in a load package     nested data flattened,     rows appended / replaced / merged,
-#                                             types decided              state + load id stored with them
+#   resource ───────► extract ─────────► normalize ──────────► load
+#   (Python, yields    rows as files in    schema inferred,      tables created or altered,
+#    rows or pages)    a load package      nested data flattened  rows written, state + load id stored
 # ```
 #
 # | You declare | dlt does |
@@ -224,8 +215,6 @@ except duckdb.Error as e:
 
 # %% [markdown]
 # ## 3 · Hello world, and the three steps one at a time
-#
-# Monday's export, loaded with dlt:
 
 # %%
 pipe = dlt.pipeline(pipeline_name="qafila_payments", destination=dlt.destinations.duckdb(str(DB)),
@@ -253,6 +242,8 @@ sql("""SELECT column_name, data_type FROM information_schema.columns
 # | `_dlt_loads` | one row per load: id, status, time |
 # | `_dlt_pipeline_state` | the pipeline's state, e.g. incremental cursors (§5) |
 # | `_dlt_version` | every version of the schema dlt inferred |
+#
+# The load log answers "which load wrote this row?":
 
 # %%
 sql("SELECT load_id, schema_name, status, inserted_at FROM raw._dlt_loads")
@@ -277,8 +268,7 @@ print("after extract:")
 extracted = package_files()
 
 # %% [markdown]
-# 🔍 Extract only wrote the rows, as they came, to a compressed file in a new package (`normalize/extracted/`).
-# Nothing has reached DuckDB.
+# 🔍 Extract only wrote the rows, as they came, to a compressed file in a new package. Nothing has reached DuckDB.
 
 # %%
 pipe.normalize()
@@ -297,8 +287,8 @@ package_files()
 sql("SELECT payment_id, status, _dlt_load_id FROM raw.payments_steps")
 
 # %% [markdown]
-# 🔍 The package moved to `load/loaded/` and the rows are in `raw.payments_steps`. If a step fails, the package stays
-# where it was, and the next run picks it up from there: nothing is extracted twice.
+# 🔍 The package moved to `load/loaded/`. If a step fails, the package stays where it was, and the next run picks it
+# up from there: nothing is extracted twice.
 
 # %% [markdown] 🎓
 # 🎓 The point of the three steps: extract can be slow (an API), load can fail (a full disk). Because every package
@@ -315,7 +305,7 @@ sql("SELECT payment_id, status, _dlt_load_id FROM raw.payments_steps")
 # | `replace` | swaps the table for its rows | small reference tables you can resend whole |
 # | `merge` | upserts on the `primary_key`: a new version replaces the old one | records that change: payments, orders |
 #
-# Load Monday's export, then Tuesday's changes (the refund of 9003 and payment 9004), once with each disposition.
+# Load Monday's export, then Tuesday's changes (the refund of 9003 and payment 9004), once with each.
 #
 # 🤔 **Predict** · How many rows does each table end with?
 
@@ -340,27 +330,17 @@ V.table_steps([
 # 🔍 `append` kept both versions of 9003 (the script's bug). `replace` kept only Tuesday's two rows: it is right only
 # when each run sends **everything**. `merge` has one row per payment, each at its latest version.
 #
-# ✏️ **Exercise 1** · Qafila's store list is exported whole every night. On Tuesday, `DMM-01` has closed and is no
-# longer in the export. Load both exports into `stores` so the table always equals the latest export.
-# - **Check yourself:** two stores, no `DMM-01`. Then try `merge`: why does `DMM-01` stay?
+# Qafila's store list is one such export, sent whole every night. On Tuesday, `DMM-01` has closed and is no longer
+# in it. With `replace`, the table always equals the latest export:
 
 # %%
 STORES_MON = [{"store_id": "RUH-04", "city": "Riyadh"}, {"store_id": "JED-03", "city": "Jeddah"},
               {"store_id": "DMM-01", "city": "Dammam"}]
 STORES_TUE = [{"store_id": "RUH-04", "city": "Riyadh"}, {"store_id": "JED-03", "city": "Jeddah"}]
 
-# Template:
-# for export in [STORES_MON, STORES_TUE]:
-#     pipe.run(export, table_name="stores", write_disposition="___")
-# BEGIN SOLUTION
 for export in [STORES_MON, STORES_TUE]:
     pipe.run(export, table_name="stores", write_disposition="replace")
-# END SOLUTION
-
-# %%
-stores = sql("SELECT store_id, city FROM raw.stores ORDER BY store_id")
-display(stores)
-U.check(stores.store_id.tolist() == ["JED-03", "RUH-04"], "the table equals Tuesday's export")
+sql("SELECT store_id, city FROM raw.stores ORDER BY store_id")
 
 # %% [markdown]
 # 🔍 With `merge`, `DMM-01` would stay forever: a merge only touches the keys it receives, so a row that disappears
@@ -386,8 +366,7 @@ for day in [MON, TUE]:
 sql("SELECT payment_id, status, updated_at FROM raw.payments ORDER BY 1")
 
 # %% [markdown]
-# 🔍 Monday asked for everything since the initial value, Tuesday only for changes since Monday's last payment. The
-# cursor lives in the pipeline's state:
+# 🔍 Tuesday asked only for changes since Monday's last payment. The cursor lives in the pipeline's state:
 
 # %%
 pipe.state["sources"]["qafila_payments"]["resources"]["payments"]["incremental"]["updated_at"]
@@ -401,9 +380,8 @@ print(pipe.last_trace.last_normalize_info.row_counts)
 U.check(sql("SELECT count(*) AS n FROM raw.payments").n[0] == 4, "still one row per payment")
 
 # %% [markdown]
-# 🔍 It asked for changes since 12:45 Tuesday and got back payment 9004 again (`since` is inclusive). dlt remembered
-# that it had loaded that exact row and dropped it, so the run loaded **no** payments. Even without that, `merge` on
-# `payment_id` would have made the retry harmless.
+# 🔍 It got payment 9004 back (`since` is inclusive), but dlt remembered loading that exact row and dropped it: the
+# run loaded **no** payments. Even without that, `merge` on `payment_id` would have made the retry harmless.
 #
 # **Break it on purpose.** The state is in `pipe.working_dir` on this machine. Delete that folder, as if the job
 # moved to a new machine.
@@ -430,9 +408,9 @@ sql("SELECT version, pipeline_name, created_at, _dlt_load_id FROM raw._dlt_pipel
 # 🎓 This is the answer to the cursor-in-a-file problem in §1. Lab 1.3's first checkpoint question asks it again.
 
 # %% [markdown]
-# ## 6 · Break it on purpose: a late record slips past the cursor ➕
+# ## 6 · Break it on purpose: a late record slips past the cursor
 #
-# A cursor trusts that records arrive in `updated_at` order. Payment **9006** was made Wednesday at 08:50, but the
+# ➕ A cursor trusts that records arrive in `updated_at` order. Payment **9006** was made Wednesday at 08:50, but the
 # provider only exported it on Thursday.
 #
 # 🤔 **Predict** · Thursday's run asks for changes since Wednesday 09:15 (payment 9005). Does 9006 arrive?
@@ -445,40 +423,24 @@ U.check(9006 not in loaded.payment_id.tolist(), "9006 is missing, and nothing fa
 
 # %% [markdown]
 # 🔍 9006 is older than the cursor, so no run will ever ask for it. A **lag** makes each run re-read a window before
-# the cursor: `incremental(..., lag=3600)` asks for changes since an hour before `last_value`. Rows re-read in that
-# window are already loaded, and `merge` replaces them with themselves, so the overlap is safe.
-#
-# ✏️ **Exercise 2** · Write `payments_lagged`: the same resource, loading into the table `payments_lagged` with a lag
-# of one hour, and run it for Monday to Thursday.
-# - **Check yourself:** all seven payments, each once.
+# the cursor. The same resource with `lag=3600` asks for changes since an hour before `last_value`. Rows re-read in
+# that window are already loaded, and `merge` replaces them with themselves, so the overlap is safe.
 
 # %%
-# Template:
-# @dlt.resource(name="payments_lagged", primary_key="___", write_disposition="___")
-# def payments_lagged(day, updated_at=dlt.sources.incremental("updated_at", initial_value="2026-09-01T00:00:00Z",
-#                                                             lag=___)):
-#     print(f"  {day}: asking the provider for changes since {updated_at.last_value}")
-#     yield provider(day, since=updated_at.last_value)
-# BEGIN SOLUTION
 @dlt.resource(name="payments_lagged", primary_key="payment_id", write_disposition="merge")
 def payments_lagged(day, updated_at=dlt.sources.incremental("updated_at", initial_value="2026-09-01T00:00:00Z",
                                                             lag=3600)):
     print(f"  {day}: asking the provider for changes since {updated_at.last_value}")
     yield provider(day, since=updated_at.last_value)
-# END SOLUTION
 
 
 for day in [MON, TUE, WED, THU]:
     pipe.run(payments_lagged(day))
-
-# %%
-lagged = sql("SELECT payment_id, count(*) AS n FROM raw.payments_lagged GROUP BY 1 ORDER BY 1")
-U.check(lagged.payment_id.tolist() == list(range(9001, 9008)), "all seven payments, including the late 9006")
-U.check((lagged.n == 1).all(), "each payment once: the re-read window was merged, not appended")
+sql("SELECT payment_id, count(*) AS n FROM raw.payments_lagged GROUP BY 1 ORDER BY 1")
 
 # %% [markdown]
-# 🔍 A lag only catches records up to an hour late. How late can a record be? Only the source can tell you (ask the
-# provider, or measure it). Streams have the same problem, with watermarks instead of cursors (Day 3).
+# 🔍 All seven payments, each once. But a lag only catches records up to an hour late. How late can a record be? Only
+# the source can tell you: ask the provider, or measure it.
 
 # %% [markdown]
 # ## 7 · Schemas: inferred, evolved, nested, and frozen by a contract
@@ -493,7 +455,7 @@ sql("""SELECT column_name, data_type FROM information_schema.columns
 # 🔍 It **evolved** the table: a new column, `NULL` for the older rows. Every change is a new schema version in
 # `_dlt_version`, so you can see when it happened.
 #
-# APIs also send **nested** data. An order from the app's API:
+# ➕ APIs also send **nested** data. An order from the app's API:
 
 # %%
 ORDERS = [{"order_id": 106, "store_id": "JED-03", "customer": {"id": 5501, "city": "Jeddah"},
@@ -506,8 +468,8 @@ sql("SELECT * FROM raw.orders__items")
 # 🔍 A nested object becomes columns (`customer__id`, `customer__city`). A list becomes a **child table**,
 # `orders__items`, one row per element, linked to its parent by `_dlt_parent_id` = the parent's `_dlt_id`.
 #
-# 🤔 **Predict** · A supplier sends prices. In week 38 their export switches to a decimal comma: `"9,49"`. What
-# happens to the `unit_cost` column?
+# ➕ 🤔 **Predict** · A supplier sends Purchasing its prices. In week 38 their export switches to a decimal comma:
+# `"9,49"`. What happens to the `unit_cost` column?
 
 # %%
 PRICES_W37 = [{"sku": "TEA-01", "unit_cost": 9.49}, {"sku": "DATES-1KG", "unit_cost": 31.00}]
@@ -518,12 +480,10 @@ sql("SELECT sku, unit_cost, unit_cost__v_text, _dlt_load_id FROM raw.prices")
 
 # %% [markdown]
 # 🔍 dlt didn't fail and didn't guess: the text landed in a **variant column**, `unit_cost__v_text`. The bronze zone
-# (`raw`) has everything the supplier sent, but a report on `unit_cost` now silently misses week 38. Lab 1.3's stretch meets this
-# in the real supplier files.
+# has everything the supplier sent, but a report on `unit_cost` now silently misses week 38.
 #
-# Tolerant is the right default for bronze. When a table must not change without someone deciding it, declare a
-# **schema contract**. Each part (`tables`, `columns`, `data_type`) is `evolve` (the default), `freeze` (fail),
-# `discard_row` or `discard_value`.
+# ➕ When a table must not change without someone deciding it, declare a **schema contract**. Here new columns are
+# frozen, and a payment arrives with one:
 
 # %%
 from dlt.pipeline.exceptions import PipelineStepFailed
@@ -537,48 +497,18 @@ except PipelineStepFailed as e:
 _ = pipe.abort_packages()   # throw away the package that failed, or the next run tries it again
 
 # %% [markdown]
-# 🔍 The run failed in **normalize**, before anything reached the table. `abort_packages()` discards the
-# failed package; without it, dlt would try that package again on the next run.
+# 🔍 The run failed in **normalize**, before anything reached the table. `{"data_type": "freeze"}` would have refused
+# week 38's `"9,49"` the same way.
 #
-# ✏️ **Exercise 3** · Load week 37 into `prices_strict` with a contract that lets new columns in but **fails** when a
-# value doesn't fit its column's type. Then load week 38 and catch the failure.
-# - **Check yourself:** `prices_strict` has week 37's two rows and no `__v_text` column.
-
-# %%
-# Template:
-# pipe.run(PRICES_W37, table_name="prices_strict", schema_contract={"___": "___"})
-# try:
-#     pipe.run(PRICES_W38, table_name="prices_strict", schema_contract={"___": "___"})
-# except PipelineStepFailed as e:
-#     print("❌ week 38 refused in step:", e.step)
-#     pipe.abort_packages()
-# BEGIN SOLUTION
-pipe.run(PRICES_W37, table_name="prices_strict", schema_contract={"data_type": "freeze"})
-try:
-    pipe.run(PRICES_W38, table_name="prices_strict", schema_contract={"data_type": "freeze"})
-except PipelineStepFailed as e:
-    print("❌ week 38 refused in step:", e.step)
-    pipe.abort_packages()
-# END SOLUTION
-
-# %%
-strict_cols = sql("""SELECT column_name FROM information_schema.columns
-                     WHERE table_schema = 'raw' AND table_name = 'prices_strict'""").column_name.tolist()
-U.check(sql("SELECT count(*) AS n FROM raw.prices_strict").n[0] == 2, "only week 37's two rows")
-U.check(not any(c.endswith("__v_text") for c in strict_cols), "no variant column: week 38 never got in")
+# Strict or tolerant is a choice per table. Bronze usually **tolerates**: new fields land, so nothing is lost, and
+# checks downstream catch the rest (Lab 2.4). Strict stops the pipeline and needs someone to answer the alert.
 
 # %% [markdown]
-# 🔍 Strict or tolerant is a choice per table: tolerant keeps the data and needs checks downstream (Lab 2.4); strict
-# stops the pipeline and needs someone to answer the alert. Lab 4.2 writes the agreement down as a data contract.
-
-# %% [markdown]
-# ## 8 · From Python lists to a real API ➕
+# ## 8 · From Python lists to a real API
 #
-# So far the provider was a Python function. The real one is an HTTP API: pages of 500 records, a cursor parameter
-# `updated_since`, and a **429 Too Many Requests** when you call too fast. `U.PaymentsAPI` is a local copy of it,
-# the one Lab 1.3 uses.
-#
-# dlt's `RESTClient` follows the pages and retries the 429s, so a resource only says where the records are:
+# ➕ The real provider is an HTTP API: pages of 500 records, a cursor parameter `updated_since`, and a **429 Too Many
+# Requests** when you call too fast. `U.PaymentsAPI` is a local copy of it, the one Lab 1.3 uses. dlt's `RESTClient`
+# follows the pages and retries the 429s:
 
 # %%
 from dlt.sources.helpers.rest_client import RESTClient
@@ -592,51 +522,19 @@ print(f"{len(pages)} pages of {[len(p) for p in pages]} records | requests: {api
 api.stop()
 
 # %% [markdown]
-# 🔍 `JSONLinkPaginator(next_url_path="next")` reads the next page's URL from each response, and `data_selector`
-# says where the records are. The 429s were retried with backoff, without a line of our code. In Lab 1.3 you first
-# write that loop yourself, then put this client inside an incremental resource.
-#
-# Databases have a ready-made source too: `sql_table(credentials=..., table="orders", incremental=...)` reads a table
-# with SQLAlchemy (Lab 1.3, task 4). Files: `dlt.sources.filesystem`.
+# 🔍 `JSONLinkPaginator(next_url_path="next")` reads the next page's URL from each response, and `data_selector` says
+# where the records are. The 429s were retried with backoff, without a line of our code. In Lab 1.3 you first write
+# that loop yourself, then put this client inside an incremental resource.
 
 # %% [markdown]
-# ## 9 · Back to the map
+# ## 9 · Summary
 #
-# dlt **ingests**: from sources into the bronze zone, with the jobs every loader needs done once and well.
-
-# %%
-V.platform_map(tool="dlt")
-
-# %% [markdown]
 # | | |
 # |---|---|
 # | **It does** | paging and retries · write dispositions · incremental cursors with state in the destination · schema inference, evolution and contracts · load ids and a load log |
 # | **It doesn't** | see rows deleted at the source (CDC, Lab 1.4) · clean or model data (Polars, dbt: Day 2) · decide when to run (Dagster, Lab 4.1) |
-# | **Managed equivalents** | Fivetran, Airbyte, AWS Glue, Azure Data Factory: the same jobs as a service, with ready-made connectors |
-# | **Streams** | Kafka Connect, Debezium: the same idea for events that never stop (Day 3) |
-#
-# **Before you write a loader**, talk to the source's owner: what changes, how often, how deletes show up, what the
-# keys are, and who to call when it breaks. That conversation is the first draft of a data contract (Day 4). Each kind
-# of source fails in its own ways:
-#
-# | Source | What goes wrong |
-# |---|---|
-# | databases | load on production, long-running queries, deletes you can't see, time zones in timestamps |
-# | APIs | paging, rate limits, tokens that expire, fields that appear or disappear |
-# | files | late or partial uploads, encodings, delimiters, renamed columns, files sent twice |
-# | events | duplicates, late and out-of-order arrival, a schema per producer version (Day 3) |
-#
-# **When the schema changes**, the response depends on the kind of change:
-#
-# | Change | Kind | Typical response |
-# |---|---|---|
-# | a new column (`wallet_provider`) | additive | add it, nullable (dlt's default, §7) |
-# | a wider type (int → bigint) | compatible | widen it |
-# | a renamed column, a narrower type, a new meaning | breaking | stop, alert, map or version explicitly (a contract, §7) |
-# | a removed column | breaking | keep the column, fill nulls, alert |
-#
-# Bronze **tolerates**: land new fields so nothing is lost. Silver **enforces**: typed models fail loudly instead of
-# quietly producing nulls (Day 2).
+# | **In this course** | Lab 1.3 loads the payments API and the app database into a DuckDB `raw` schema, the bronze zone |
+# | **As a service** | Fivetran, Airbyte, AWS Glue, Azure Data Factory: the same jobs, hosted, with ready-made connectors |
 #
 # **Cheat sheet**
 #
@@ -644,20 +542,25 @@ V.platform_map(tool="dlt")
 # |---|---|
 # | `dlt.pipeline(pipeline_name=..., destination=..., dataset_name=...)` | a named pipeline into a dataset |
 # | `pipe.run(data, table_name=..., write_disposition=..., primary_key=...)` | extract + normalize + load |
+# | `pipe.extract(...)`, `pipe.normalize()`, `pipe.load()` | the three steps one at a time |
+# | `write_disposition="append"` / `"replace"` / `"merge"` | events and logs / small tables sent whole / records that change (upsert on `primary_key`) |
 # | `@dlt.resource(name=..., primary_key=..., write_disposition="merge")` | a generator with load instructions |
 # | `dlt.sources.incremental("updated_at", initial_value=..., lag=...)` | a cursor kept in state |
-# | `schema_contract={"columns": "freeze"}` | fail instead of evolving |
+# | `schema_contract={"columns": "freeze"}` | fail instead of evolving; parts `tables`, `columns`, `data_type`; modes `evolve` (default), `freeze`, `discard_row`, `discard_value` |
 # | `pipe.state`, `raw._dlt_pipeline_state` | the state, locally and in the destination |
 # | `raw._dlt_loads`, `_dlt_load_id` | the load log, and the load of each row |
+# | `_dlt_id`, `_dlt_parent_id` | a row's id, and the parent row of a child-table row |
+# | `raw._dlt_version` | every version of the schema |
 # | `pipe.abort_packages()` | discard a package that failed |
+# | `RESTClient(base_url=..., paginator=..., data_selector=...)` | an HTTP client that pages and retries |
+# | `sql_table(credentials=..., table=..., incremental=...)`, `filesystem(...)` | ready-made sources for databases (SQLAlchemy) and files |
 #
 # ## Checkpoint
 #
 # 1. The script in §1 broke in four ways. Which dlt feature answers each?
 # 2. When is `replace` right, and why can't `merge` see that a store closed?
-# 3. Why must the cursor be saved in the same transaction as the data, and where does dlt keep it?
-# 4. A lag of one hour: what does it cost, and what does it still miss?
-# 5. Week 38's `"9,49"`: is the variant column a feature or a trap? Who should find out, and when?
+# 3. Where does dlt keep the cursor, and why there? What does a lag of one hour fix, and what does it still miss?
+# 4. Week 38's `"9,49"`: is the variant column a feature or a trap? Who should find out, and when?
 #
 # Next: [Lab 1.3 · Ingest Qafila with dlt](../D1_3_ingestion_dlt.ipynb). Docs:
 # [pipeline](https://dlthub.com/docs/general-usage/pipeline) ·
@@ -667,9 +570,7 @@ V.platform_map(tool="dlt")
 # [schema contracts](https://dlthub.com/docs/general-usage/schema-contracts) ·
 # [REST client](https://dlthub.com/docs/general-usage/http/rest-client).
 #
-# ## 🖼️ Visual summary
-#
-# **The dataset dlt built:** our tables, the child table and dlt's own `_dlt_*` tables.
+# **What you built:** the dataset dlt built, with our tables, the child table and dlt's own `_dlt_*` tables.
 
 # %%
 V.database_map(sql("SELECT table_schema, table_name, table_type FROM information_schema.tables"))
