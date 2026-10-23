@@ -379,7 +379,23 @@ def run_dbt(args: list[str], project_dir: Path | str = DBT_PROJECT, db_path: Pat
     res = dbtRunner().invoke(cli)
     if not res.success:
         raise RuntimeError(f"dbt {' '.join(args)} failed: {res.exception or 'see the log above'}")
-    return res
+    return DbtResult(res)
+
+
+class DbtResult:
+    """dbt's result (.success, .result, .exception), shown as nothing when a cell ends with a dbt call.
+
+    dbtRunnerResult's own repr spells out every node of the run: thousands of lines after a `dbt build`.
+    """
+
+    def __init__(self, res):
+        self._res = res
+
+    def __getattr__(self, name):
+        return getattr(self._res, name)
+
+    def _ipython_display_(self):
+        pass
 
 
 # ---------------------------------------------------------------------------
