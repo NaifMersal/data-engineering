@@ -1,7 +1,7 @@
 # %% [markdown]
 # # Lab 1.2 · Parquet in practice
 #
-# Day 1 · Session 2 (Files & columnar storage) · 25 min. What you'll do:
+# Day 1 · Session 2 (Storage for analytics, part 2: columns in a file) · 25 min. What you'll do:
 # - store the same few million Qafila order lines as CSV and as Parquet (Snappy, ZSTD) and measure size and speed;
 # - open a Parquet footer and read its row groups, statistics and encodings;
 # - see why **sorting** and **partitioning** let an engine skip most of a file, and how over-partitioning backfires.
@@ -36,7 +36,7 @@ print("data:", U.RAW, "| quick mode:", U.QUICK)
 
 # %%
 import duckdb
-import pandas as pd
+from IPython.display import display
 
 con = duckdb.connect()
 con.sql("SET enable_progress_bar = false")
@@ -97,17 +97,17 @@ QUERY = "SELECT city, round(sum(amount)) AS revenue FROM {src} WHERE status = 'd
 files = {"CSV": f"read_csv('{O}/lines.csv')",
          "Parquet snappy": f"'{O}/lines_snappy.parquet'",
          "Parquet zstd": f"'{O}/lines_zstd.parquet'"}
-rows = []
+results = []
 for name, src in files.items():
     path = OUT / {"CSV": "lines.csv", "Parquet snappy": "lines_snappy.parquet", "Parquet zstd": "lines_zstd.parquet"}[name]
     secs = U.best_of(lambda: con.sql(QUERY.format(src=src)).fetchall())
-    rows.append({"format": name, "size_mb": round(U.size_mb(path), 1), "query_ms": round(secs * 1000)})
-results = pd.DataFrame(rows)
-results
+    results.append({"format": name, "size_mb": round(U.size_mb(path), 1), "query_ms": round(secs * 1000)})
+for r in results:
+    print(f"{r['format']:15s} {r['size_mb']:8.1f} MB {r['query_ms']:7,d} ms")
 
 # %%
 assert con.sql(QUERY.format(src=files["CSV"])).fetchall() == con.sql(QUERY.format(src=files["Parquet zstd"])).fetchall()
-csv_mb, zstd_mb = results.size_mb.iloc[0], results.size_mb.iloc[2]
+csv_mb, zstd_mb = results[0]["size_mb"], results[2]["size_mb"]
 U.check(zstd_mb < csv_mb / 3, f"ZSTD Parquet is {csv_mb / zstd_mb:.1f}x smaller than CSV")
 
 # %% [markdown]
@@ -121,25 +121,34 @@ U.check(zstd_mb < csv_mb / 3, f"ZSTD Parquet is {csv_mb / zstd_mb:.1f}x smaller 
 # **column chunk** (= column × row group).
 
 # %%
-meta = con.sql(f"SELECT * FROM parquet_metadata('{O}/lines_zstd.parquet')").df()
-print(meta.columns.tolist())
-meta[["row_group_id", "row_group_num_rows", "path_in_schema", "type", "stats_min", "stats_max",
-      "compression", "encodings", "total_compressed_size", "total_uncompressed_size"]].head(13)
+ZSTD = f"{O}/lines_zstd.parquet"
+con.sql(f"""
+    SELECT row_group_id, row_group_num_rows, path_in_schema, type, stats_min, stats_max,
+           compression, encodings, total_compressed_size, total_uncompressed_size
+    FROM parquet_metadata('{ZSTD}')
+    LIMIT 13""")
 
 # %% [markdown]
-# ✏️ **Exercise** · From `meta`, compute:
-# - `n_row_groups`: how many row groups the file has;
-# - `col_bytes`: a pandas Series with the total **compressed** bytes per column (`path_in_schema`), largest first.
+# ✏️ **Exercise** · With SQL on `parquet_metadata(ZSTD)`, compute:
+# - `n_row_groups`: how many row groups the file has (a number: end the query with `.fetchall()[0][0]`);
+# - `col_bytes`: a query with one row per column, `column_name` (= `path_in_schema`) and `bytes` (the total
+#   **compressed** size, `total_compressed_size`), largest first.
 
 # %%
 # BEGIN SOLUTION
-n_row_groups = meta.row_group_id.nunique()
-col_bytes = meta.groupby("path_in_schema").total_compressed_size.sum().sort_values(ascending=False)
+n_row_groups = con.sql(f"SELECT count(DISTINCT row_group_id) FROM parquet_metadata('{ZSTD}')").fetchall()[0][0]
+col_bytes = con.sql(f"""
+    SELECT path_in_schema AS column_name, sum(total_compressed_size) AS bytes
+    FROM parquet_metadata('{ZSTD}')
+    GROUP BY ALL
+    ORDER BY bytes DESC""")
 # END SOLUTION
-print(f"{n_row_groups} row groups of up to {meta.row_group_num_rows.max():,} rows")
-print((col_bytes / n_rows).round(2).rename("bytes per row").to_string())
+print(f"{n_row_groups} row groups for {n_rows:,} rows")
+bytes_per_row = con.sql(f"SELECT column_name, round(bytes / {n_rows}, 2) AS bytes_per_row FROM col_bytes")
+display(bytes_per_row)
+sizes = dict(col_bytes.fetchall())
 U.check(n_row_groups >= 2, "the file has several row groups")
-U.check(col_bytes["order_id"] > 5 * col_bytes["store_id"], "store_id costs a fraction of order_id")
+U.check(sizes["order_id"] > 5 * sizes["store_id"], "store_id costs a fraction of order_id")
 
 # %% [markdown]
 # 🔍 `store_id` has 12 distinct values in millions of rows. **Dictionary encoding** stores each value once and the column
@@ -149,7 +158,11 @@ U.check(col_bytes["order_id"] > 5 * col_bytes["store_id"], "store_id costs a fra
 # Now look at the statistics of `created_at` per row group:
 
 # %%
-meta[meta.path_in_schema == "created_at"][["row_group_id", "row_group_num_rows", "stats_min", "stats_max"]].head(8)
+con.sql(f"""
+    SELECT row_group_id, row_group_num_rows, stats_min, stats_max
+    FROM parquet_metadata('{ZSTD}')
+    WHERE path_in_schema = 'created_at'
+    LIMIT 8""")
 
 # %% [markdown]
 # Every row group spans (almost) the whole two months: the rows are shuffled. A filter on one day can't rule out any row group.
@@ -164,18 +177,20 @@ con.sql(f"COPY (FROM lines ORDER BY created_at) TO '{O}/sorted.parquet' (FORMAT 
 DAY_FROM, DAY_TO = "2026-09-23 00:00:00", "2026-09-24 00:00:00"
 
 # %% [markdown]
-# ✏️ **Exercise** · Write `prunable(path)`: using `parquet_metadata`, return `(total_row_groups, row_groups_to_read)` for the filter
-# `created_at >= DAY_FROM AND created_at < DAY_TO`. A row group must be read if its `[stats_min, stats_max]` range overlaps
-# the filter. (`stats_min`/`stats_max` are strings; ISO timestamps compare correctly as strings.)
+# ✏️ **Exercise** · Write `prunable(path)`: with one SQL query on `parquet_metadata`, return
+# `(total_row_groups, row_groups_to_read)` for the filter `created_at >= DAY_FROM AND created_at < DAY_TO`. Keep the
+# rows of the `created_at` column. A row group must be read if its `[stats_min, stats_max]` range overlaps the filter:
+# `stats_max >= DAY_FROM AND stats_min < DAY_TO`. Hint: `count(*) FILTER (WHERE ...)` counts only some rows, and
+# `.fetchall()[0]` is the one result row as a tuple. (`stats_min`/`stats_max` are strings; ISO timestamps compare
+# correctly as strings.)
 
 # %%
 def prunable(path):
     # BEGIN SOLUTION
-    m = con.sql(f"""
-        SELECT row_group_id, stats_min, stats_max FROM parquet_metadata('{path}')
-        WHERE path_in_schema = 'created_at'""").df()
-    must_read = ((m.stats_max >= DAY_FROM) & (m.stats_min < DAY_TO)).sum()
-    return len(m), int(must_read)
+    return con.sql(f"""
+        SELECT count(*), count(*) FILTER (WHERE stats_max >= '{DAY_FROM}' AND stats_min < '{DAY_TO}')
+        FROM parquet_metadata('{path}')
+        WHERE path_in_schema = 'created_at'""").fetchall()[0]
     # END SOLUTION
 
 for name in ["unsorted", "sorted"]:
@@ -191,7 +206,9 @@ U.check(prunable(f"{O}/sorted.parquet")[1] < prunable(f"{O}/unsorted.parquet")[1
 # 🔍 Same data, same query, same answer. Sorted by the filter column, the statistics are tight and nearly every row group
 # is skipped without being read. This is why table formats (Day 3) offer **sort orders** and **clustering**.
 #
-# You can also see it in the plan: `EXPLAIN ANALYZE` shows how many rows the scan actually produced.
+# You can also see it in the plan. `EXPLAIN ANALYZE` runs the query and prints its **plan**, the steps the engine took,
+# read from the bottom up. The bottom box is the scan of the file: the filter it pushed into the read and the rows it
+# actually produced.
 
 # %%
 print(con.sql(f"EXPLAIN ANALYZE SELECT sum(amount) FROM '{O}/sorted.parquet' WHERE created_at >= '{DAY_FROM}' AND created_at < '{DAY_TO}'").fetchall()[0][1][-1800:])
@@ -230,9 +247,8 @@ U.check(U.count_files(OUT / "by_date") == 61, "one folder per day")
 #
 # Someone suggests partitioning by date **and** store "for faster store reports". Let's measure.
 #
-# ✏️ **Exercise** · Write `OUT/by_date_store`, partitioned by `order_date` and `store_id`. Then fill `cost` with, for each
-# layout (`sorted.parquet`, `by_date`, `by_date_store`): the number of files, total MB, and the best time of a full-table
-# aggregate `SELECT store_id, sum(amount) ... GROUP BY store_id`.
+# ✏️ **Exercise** · Write `OUT/by_date_store`, partitioned by `order_date` **and** `store_id`. The next cell measures
+# each layout: the number of files, total MB, and the best time of a full-table `SELECT store_id, sum(amount) ...`.
 
 # %%
 # BEGIN SOLUTION
@@ -240,6 +256,10 @@ con.sql(f"""
     COPY (SELECT *, created_at::DATE AS order_date FROM lines)
     TO '{O}/by_date_store' (FORMAT parquet, COMPRESSION zstd, PARTITION_BY (order_date, store_id))
 """)
+# END SOLUTION
+print(U.count_files(OUT / "by_date_store"), "files")
+
+# %%
 layouts = {"single file": (OUT / "sorted.parquet", f"'{O}/sorted.parquet'"),
            "by_date": (OUT / "by_date", by_date),
            "by_date_store": (OUT / "by_date_store", f"read_parquet('{O}/by_date_store/*/*/*.parquet', hive_partitioning = true)")}
@@ -248,13 +268,10 @@ for name, (path, src) in layouts.items():
     q = f"SELECT store_id, sum(amount) FROM {src} GROUP BY store_id"
     cost.append({"layout": name, "files": 1 if path.is_file() else U.count_files(path),
                  "size_mb": round(U.size_mb(path), 1), "full_scan_ms": round(U.best_of(lambda: con.sql(q).fetchall()) * 1000)})
-cost = pd.DataFrame(cost)
-# END SOLUTION
-cost
-
-# %%
-U.check(cost.files.iloc[2] > 500, f"{cost.files.iloc[2]} files for {cost.size_mb.iloc[2]} MB")
-U.check(cost.full_scan_ms.iloc[2] > cost.full_scan_ms.iloc[0], "the over-partitioned layout is the slowest to scan")
+for c in cost:
+    print(f"{c['layout']:14s} {c['files']:5,d} files {c['size_mb']:7.1f} MB {c['full_scan_ms']:6,d} ms")
+U.check(cost[2]["files"] > 500, f"{cost[2]['files']} files for {cost[2]['size_mb']} MB")
+U.check(cost[2]["full_scan_ms"] > cost[0]["full_scan_ms"], "the over-partitioned layout is the slowest to scan")
 
 # %% [markdown]
 # 🔍 Hundreds of small files: each one costs an open, a footer read and scheduling work, and compresses worse. On object
@@ -322,7 +339,7 @@ V.row_group_ranges(ranges, DAY_FROM, DAY_TO)
 # free; unique IDs and precise numbers cost the most.
 
 # %%
-V.bars((col_bytes / n_rows).rename("bytes_per_row").reset_index(), "path_in_schema", ["bytes_per_row"],
+V.bars(bytes_per_row, "column_name", ["bytes_per_row"],
        titles=["compressed bytes per row (ZSTD Parquet)"], fmt="{:.2f}")
 
 # %% [markdown]
