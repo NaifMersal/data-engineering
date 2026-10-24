@@ -104,3 +104,8 @@ em.k.bad{color:#a4473b;background:#f6dcd6}.t-row.total{border-top:2px solid #9fb
 .label.cell.n{border:0;background:none;font:600 13px/35px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left}.label.cell.n.r{color:#1b6f68}
 .bar.wide{grid-template-columns:190px 1fr 110px}.files.wrap{flex-wrap:wrap;height:auto}.files.wrap span{width:8px;height:15px;border-width:1px}
 .tree .hit{background:#e0f2eb;color:#1b6f68;font-weight:600;border-radius:3px}
+.cell.n small{margin-left:8px;font:400 12px var(--sans);letter-spacing:0;text-transform:none;color:#23817c}.cell.n.x small{color:inherit}
+/* D1_1 part 2: a whole column of a Parquet file as one strip, cut into row groups, with the footer at the end. */
+.label.strip{height:34px;border:1.5px solid #91a9b9;border-radius:3px;background:#fff}
+.label.foot{height:264px;display:flex;align-items:center;justify-content:center;border:2px solid #348f8d;border-radius:4px 8px 5px 3px;background:#e0f2eb;color:#1b6f68;font:600 18px var(--sans)}
+.label.right{text-align:right}

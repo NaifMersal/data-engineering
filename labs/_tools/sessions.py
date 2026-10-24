@@ -48,7 +48,7 @@ SESSIONS = [
          topics="OLTP vs. OLAP, row vs. column storage, compression; DuckDB, files in place, one writer",
          lab="D1_1_platform_tour"),
     dict(id="D1_2", title="Storage for analytics 2 · columns in a file", stage="Store", deck="D1_1_storage#15",
-         boards="15–28", topics="CSV vs. Parquet, row groups and statistics, sorting to skip, partitions, small files",
+         boards="15–30", topics="CSV vs. Parquet, row groups and statistics, sorting to skip, partitions, small files",
          lab="D1_2_files_parquet"),
     dict(id="D1_3", title="Batch ingestion", stage="Ingest", tool="dlt",
          topics="full vs. incremental, cursors, pagination, retries, schema evolution", lab="D1_3_ingestion_dlt"),
